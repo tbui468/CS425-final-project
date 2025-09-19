@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "net.h"
 
-#define SERVER_COUNT 10
+#define SERVER_COUNT 8
 
 bool has_whitespace(const char *s, size_t len) {
     for (size_t i = 0; i < len; i++) {
@@ -24,9 +24,7 @@ int main(int argc, char **argv) {
                     "3004",
                     "3005",
                     "3006",
-                    "3007",
-                    "3008",
-                    "3009"};
+                    "3007"};
 
     char buf[1024];
     buf[0] = '\0';
