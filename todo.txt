@@ -1,0 +1,32 @@
+TODO:
+    make a github repo for this since it's big enough
+        call is CS425_MPA since this isn't the regular MP 
+        call is CS425_MPB
+        call is CS425_MPC
+        call is CS425_MPD
+    client is currently taking in the grep arugments and running them directly
+    to properly simulate distributed system, need to actually make separate directories so that processes don't read eachother's files
+
+Write a distributed program to grep logs
+    each machine maintains a log file machine.i.log, eg. machine with id 2 would have a file called machine.2.log
+    should output:
+        [machine.i.log]
+            <grep output>
+
+    Since this can run on any machine, we need a server running on different ports
+    all servers should be running
+    the client is just an executable that we can run to find all occurences of "error" in any .log files
+        dgrep <port> "error" *.log
+
+    the client opens a stream socket to all 10 servers (including its own), and 
+        client sends the grep arguments over to each server
+        servers then run grep on their own directories
+        servers send the resulting grep results back to client
+        client sorts/labels results and outputs the to console/file
+       
+    step 1
+        write a program that outputs 10 log files to different directories
+        write a server program that can be associated with each directory
+            eg, dserver <port number> <directory>
+        write a client program that takes in grep
+            eg, dgrep <my server port> <grep arguments>
