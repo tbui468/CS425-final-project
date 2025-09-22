@@ -44,6 +44,8 @@ int main(int argc, char **argv) {
     grep_buf[0] = '\0';
     strcat(grep_buf, "grep ");
     strcat(grep_buf, buf);
+    
+    /*
     FILE * cmd = popen(grep_buf, "r");
     if (cmd == NULL) {
         exit(1);
@@ -53,11 +55,21 @@ int main(int argc, char **argv) {
         printf("output: %s", result);
     }
     pclose(cmd); 
+    */
 
+    
     for (int i = 0; i < SERVER_COUNT; i++) {
         sockfds[i] = net_connect("localhost", ports[i]);
         if (sockfds[i] > 0) {
-            printf("connected to server\n");
+            size_t grep_len = strlen(grep_buf) + 1; //include \0
+            net_send_msg(sockfds[i], grep_buf, (int) grep_len);
+
+            //TODO: receive grep response and output
+            size_t len;
+            char buf[1024];
+            net_recv_msg(sockfds[i], buf, &len);
+            printf("[localhost:%s]:\n%s", ports[i], buf);
+            net_disconnect(sockfds[i]);
         }
     }
 

@@ -8,16 +8,16 @@ all: client server
 	machine.3006 \
 	machine.3007
 
-client: client.c
-	gcc -o client client.c
+client: dgrep.c
+	gcc -o dgrep dgrep.c
 
-server: server.c
-	gcc -o server server.c
+server: node.c
+	gcc -o node node.c
 
 clean:
 	rm *.log \
-	rm client \
-	rm server \
+	rm dgrep \
+	rm node \
 	rm -rf machine.3000 \
 	rm -rf machine.3001 \
 	rm -rf machine.3002 \

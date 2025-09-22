@@ -79,6 +79,11 @@ void net_send(int sockfd, char* buf, int len) {
     }
 }
 
+void net_send_msg(int sockfd, char* buf, size_t len) {
+    net_send(sockfd, (char *) &len, sizeof(size_t));
+    net_send(sockfd, buf, len); 
+}
+
 bool net_recv(int sockfd, char* buf, int len) {
     ssize_t nread = 0;
     ssize_t n;
@@ -97,6 +102,14 @@ bool net_recv(int sockfd, char* buf, int len) {
     }
 
     return true;
+}
+
+bool net_recv_msg(int sockfd, char *buf, size_t *len) {
+    if (!net_recv(sockfd, (char *) len, sizeof(size_t))) {
+        return false;
+    }
+
+    return net_recv(sockfd, buf, *len); 
 }
 
 /*

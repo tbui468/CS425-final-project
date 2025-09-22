@@ -1,6 +1,15 @@
-TODO:
-    client is currently taking in the grep arugments and running them directly
-    to properly simulate distributed system, need to actually make separate directories so that processes don't read eachother's files
+tests
+    code to build test environment (eg, generate logs)
+
+    repeat this for all tests
+        code to call dgrep with grep arguments
+        eg, check if specific lines/counts show up in the test logs
+
+    code to teardown test
+
+Refactor
+    rename server.c to node.c since this is what it is actually is supposed to be
+    rename client.c to dgrep.c since this is what it is supposed to be
 
 Write a distributed program to grep logs
     each machine maintains a log file machine.i.log, eg. machine with id 2 would have a file called machine.2.log
@@ -19,9 +28,3 @@ Write a distributed program to grep logs
         servers send the resulting grep results back to client
         client sorts/labels results and outputs the to console/file
        
-    step 1
-        write a program that outputs 10 log files to different directories
-        write a server program that can be associated with each directory
-            eg, dserver <port number> <directory>
-        write a client program that takes in grep
-            eg, dgrep <my server port> <grep arguments>
