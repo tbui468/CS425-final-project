@@ -17,14 +17,14 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    fprintf(f, "server on port %s listening\n", argv[1]);
+    fprintf(f, "Listening on [localhost:%s]\n", argv[1]);
     fflush(f);
 
     while (true) {
         int connfd = net_accept(serverfd);
         if (connfd == -1)
             continue;
-        fprintf(f, "client connected\n"); 
+        fprintf(f, "Client connected\n"); 
         fflush(f);
         size_t len;
         char buf[1024];
@@ -46,7 +46,6 @@ int main(int argc, char **argv) {
             off = strlen(result);
             //fprintf(f, "[%s] %s", argv[1], result);
             //fflush(f);
-            
         }
         pclose(cmd); 
         net_send_msg(connfd, result, strlen(result) + 1);

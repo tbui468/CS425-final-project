@@ -1,30 +1,3 @@
-tests
-    code to build test environment (eg, generate logs)
-
-    repeat this for all tests
-        code to call dgrep with grep arguments
-        eg, check if specific lines/counts show up in the test logs
-
-    code to teardown test
-
-Refactor
-    rename server.c to node.c since this is what it is actually is supposed to be
-    rename client.c to dgrep.c since this is what it is supposed to be
-
-Write a distributed program to grep logs
-    each machine maintains a log file machine.i.log, eg. machine with id 2 would have a file called machine.2.log
-    should output:
-        [machine.i.log]
-            <grep output>
-
-    Since this can run on any machine, we need a server running on different ports
-    all servers should be running
-    the client is just an executable that we can run to find all occurences of "error" in any .log files
-        dgrep <port> "error" *.log
-
-    the client opens a stream socket to all 10 servers (including its own), and 
-        client sends the grep arguments over to each server
-        servers then run grep on their own directories
-        servers send the resulting grep results back to client
-        client sorts/labels results and outputs the to console/file
-       
+Medium-Sized Result Test - this fails probably due to buffers being stack allocated and too small
+Large-Sized Result Test
+Failed Node Test

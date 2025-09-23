@@ -15,9 +15,10 @@ server: node.c
 	gcc -o node node.c
 
 clean:
-	rm *.log \
 	rm dgrep \
 	rm node \
+	rm medium_lorem_ipsum.txt \
+	rm large_lorem_ipsum.txt \
 	rm -rf machine.3000 \
 	rm -rf machine.3001 \
 	rm -rf machine.3002 \

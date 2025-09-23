@@ -67,9 +67,14 @@ int main(int argc, char **argv) {
             //TODO: receive grep response and output
             size_t len;
             char buf[1024];
-            net_recv_msg(sockfds[i], buf, &len);
-            printf("[localhost:%s]:\n%s", ports[i], buf);
+            if (net_recv_msg(sockfds[i], buf, &len)) {
+                printf("[localhost:%s]:\n%s", ports[i], buf);
+            } else {
+                printf("Connection to [localhost:%s] ended\n", ports[i]);
+            }
             net_disconnect(sockfds[i]);
+        } else {
+            printf("Failed to connect to [localhost:%s]\n", ports[i]);
         }
     }
 
