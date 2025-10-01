@@ -18,7 +18,7 @@ done
 total=0
 passed=0
 
-dirs=("machine.3000" 
+machine_dirs=("machine.3000" 
       "machine.3001"
       "machine.3002"
       "machine.3003"
@@ -28,209 +28,57 @@ dirs=("machine.3000"
       "machine.3007")
 
 echo "========Basic Test========"
+./basic_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-
-./start_nodes.sh > /dev/null
-
-idx=1
-for dir in "${dirs[@]}"; do
-    pushd ./${dir} > /dev/null
-    > ${dir}.log
-    for i in {1..10}; do
-        if [ $idx -eq $i ]; then
-            echo "dog" >> "${dir}.log"
-        else
-            echo "cat" >> "${dir}.log"
-        fi
-    done
-    popd > /dev/null
-    ((idx++))
-done
-
-#./dgrep -E "\"Listening.*local|local.*Listening\"" *.log
-cnt=`./dgrep dog *.log | grep dog | wc -l`
-if [ $cnt -eq 8 ]; then
-    echo "Passed"
-    ((passed++))
-else
-    echo "Failed"
-fi
-
-./stop_nodes.sh > /dev/null
 
 echo "========On One Machine Test========"
+./on_one_machine_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-
-./start_nodes.sh > /dev/null
-
-idx=1
-for dir in "${dirs[@]}"; do
-    pushd ./${dir} > /dev/null
-    > ${dir}.log
-    if [ $idx -eq 4 ]; then
-        echo "dog" >> "${dir}.log"
-    fi
-    for i in {1..10}; do
-        echo "cat" >> "${dir}.log"
-    done
-    popd > /dev/null
-    ((idx++))
-done
-
-cnt=`./dgrep dog *.log | grep dog | wc -l`
-if [ $cnt -eq 1 ]; then
-    echo "Passed"
-    ((passed++))
-else
-    echo "Failed"
-fi
-
-./stop_nodes.sh > /dev/null
 
 echo "========On Some Machines Test========"
+./on_some_machines_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-
-./start_nodes.sh > /dev/null
-
-idx=1
-for dir in "${dirs[@]}"; do
-    pushd ./${dir} > /dev/null
-    > ${dir}.log
-    if [ $idx -lt 5 ]; then
-        echo "dog" >> "${dir}.log"
-    fi
-    for i in {1..10}; do
-        echo "cat" >> "${dir}.log"
-    done
-    popd > /dev/null
-    ((idx++))
-done
-
-cnt=`./dgrep dog *.log | grep dog | wc -l`
-if [ $cnt -eq 4 ]; then
-    echo "Passed"
-    ((passed++))
-else
-    echo "Failed"
-fi
-
-./stop_nodes.sh > /dev/null
 
 echo "========On All Machines Test========"
+./on_all_machines_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-
-./start_nodes.sh > /dev/null
-
-idx=1
-for dir in "${dirs[@]}"; do
-    pushd ./${dir} > /dev/null
-    > ${dir}.log
-    for i in {1..10}; do
-        echo "cat" >> "${dir}.log"
-    done
-    echo "dog" >> "${dir}.log"
-    popd > /dev/null
-    ((idx++))
-done
-
-cnt=`./dgrep dog *.log | grep dog | wc -l`
-if [ $cnt -eq 8 ]; then
-    echo "Passed"
-    ((passed++))
-else
-    echo "Failed"
-fi
-
-./stop_nodes.sh > /dev/null
 
 echo "========Medium-Sized Log Test========"
+./medium_sized_log_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-
-./start_nodes.sh > /dev/null
-
-idx=1
-for dir in "${dirs[@]}"; do
-    pushd ./${dir} > /dev/null
-    > ${dir}.log
-    cat ./../medium_lorem_ipsum.txt > "${dir}.log"
-    for i in {1..10}; do
-        echo "cat" >> "${dir}.log"
-    done
-    echo "dog" >> "${dir}.log"
-    popd > /dev/null
-    ((idx++))
-done
-
-cnt=`./dgrep dog *.log | grep dog | wc -l`
-if [ $cnt -eq 8 ]; then
-    echo "Passed"
-    ((passed++))
-else
-    echo "Failed"
-fi
-
-./stop_nodes.sh > /dev/null
 
 echo "========Large-Sized Log Test========"
+./large_sized_log_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-
-./start_nodes.sh > /dev/null
-
-idx=1
-for dir in "${dirs[@]}"; do
-    pushd ./${dir} > /dev/null
-    > ${dir}.log
-    cat ./../large_lorem_ipsum.txt > "${dir}.log"
-    for i in {1..10}; do
-        echo "cat" >> "${dir}.log"
-    done
-    echo "dog" >> "${dir}.log"
-    popd > /dev/null
-    ((idx++))
-done
-
-cnt=`./dgrep dog *.log | grep dog | wc -l`
-if [ $cnt -eq 8 ]; then
-    echo "Passed"
-    ((passed++))
-else
-    echo "Failed"
-fi
-
-./stop_nodes.sh > /dev/null
 
 echo "========Medium-Sized Result Test========"
+./medium_sized_result_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-
-./start_nodes.sh > /dev/null
-
-idx=1
-for dir in "${dirs[@]}"; do
-    pushd ./${dir} > /dev/null
-    > ${dir}.log
-    cat ./../medium_lorem_ipsum.txt > "${dir}.log"
-    popd > /dev/null
-    ((idx++))
-done
-
-cnt=`./dgrep Lorem *.log | grep Lorem | wc -l`
-if [ $cnt -eq 8 ]; then
-    echo "Passed"
-    ((passed++))
-else
-    echo "Failed"
-fi
-echo $cnt
-./stop_nodes.sh > /dev/null
 
 echo "========Large-Sized Result Test========"
+./large_sized_result_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-echo "Failed"
 
 echo "========Failed Node Test========"
+./failed_node_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
 ((total++))
-echo "Failed"
+
+echo "========Failed Nodes Test========"
+./failed_nodes_test.sh ${machine_dirs[@]}
+passed=$((passed + $?))
+((total++))
 
 echo " "
 echo "========TOTAL PASSED========"
 echo "${passed}/${total}"
+
+

@@ -39,16 +39,34 @@ int main(int argc, char **argv) {
         if (cmd == NULL) {
             exit(1);
         }
+        /*
         char result[1024];
         result[0] = '\0';
         size_t off = 0;
         while (fgets(result + off, sizeof(result), cmd)) {
-            off = strlen(result);
-            //fprintf(f, "[%s] %s", argv[1], result);
-            //fflush(f);
+            fprintf(f, "sizeof(result): %ld\n", sizeof(result)); 
+            fflush(f);
+            //off = strlen(result);
+            net_send_msg(connfd, result, strlen(result) + 1);
         }
+        */
+        size_t capacity = 1024;
+        char *result = malloc(capacity);
+        result[0] = '\0';
+        size_t size = strlen(result);
+        while (fgets(result + size, capacity - size, cmd)) {
+            size = strlen(result);
+            if (size == capacity - 1) {
+                capacity *= 2;
+                result = realloc(result, capacity);
+            }
+        }
+            fprintf(f, "sizeof(result): %ld\n", size); 
+            fflush(f);
+        net_send_msg(connfd, result, size + 1);
+        free(result);
+        
         pclose(cmd); 
-        net_send_msg(connfd, result, strlen(result) + 1);
         net_disconnect(connfd);
     }
     return 0;

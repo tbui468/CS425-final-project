@@ -68,9 +68,9 @@ void net_send(int sockfd, char* buf, int len) {
 
     while (written < len) {
         if ((n = send(sockfd, buf + written, len - written, 0)) <= 0) {
-            if (n < 0 && errno == EINTR) //interrupted but not error, so we need to try again
+            if (n < 0 && errno == EINTR) {//interrupted but not error, so we need to try again
                 n = 0;
-            else {
+            } else {
                 exit(1); //real error
             }
         }
@@ -108,8 +108,22 @@ bool net_recv_msg(int sockfd, char *buf, size_t *len) {
     if (!net_recv(sockfd, (char *) len, sizeof(size_t))) {
         return false;
     }
-
     return net_recv(sockfd, buf, *len); 
+}
+
+bool net_alloc_recv_msg(int sockfd, void* (allocator)(size_t), char **out_buf, size_t *len) {
+    if (!net_recv(sockfd, (char *) len, sizeof(size_t))) {
+        return false;
+    }
+
+    char *buf = allocator(*len);
+    *out_buf = buf;
+    if (!net_recv(sockfd, buf, *len)) {
+        free(buf);
+        return false;
+    }
+
+    return true;
 }
 
 /*
