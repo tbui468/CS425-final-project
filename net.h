@@ -80,7 +80,8 @@ void net_send(int sockfd, char* buf, int len) {
 }
 
 void net_send_msg(int sockfd, char* buf, size_t len) {
-    net_send(sockfd, (char *) &len, sizeof(size_t));
+    uint32_t fixed_len = len;
+    net_send(sockfd, (char *) &fixed_len, sizeof(uint32_t));
     net_send(sockfd, buf, len); 
 }
 
@@ -104,18 +105,13 @@ bool net_recv(int sockfd, char* buf, int len) {
     return true;
 }
 
-bool net_recv_msg(int sockfd, char *buf, size_t *len) {
-    if (!net_recv(sockfd, (char *) len, sizeof(size_t))) {
-        return false;
-    }
-    return net_recv(sockfd, buf, *len); 
-}
-
-bool net_alloc_recv_msg(int sockfd, void* (allocator)(size_t), char **out_buf, size_t *len) {
-    if (!net_recv(sockfd, (char *) len, sizeof(size_t))) {
+bool net_recv_msg(int sockfd, void* (allocator)(size_t), char **out_buf, size_t *len) {
+    uint32_t fixed_len;
+    if (!net_recv(sockfd, (char *) &fixed_len, sizeof(uint32_t))) {
         return false;
     }
 
+    *len = fixed_len;
     char *buf = allocator(*len);
     *out_buf = buf;
     if (!net_recv(sockfd, buf, *len)) {

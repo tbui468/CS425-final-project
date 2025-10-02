@@ -3,7 +3,7 @@
 
 idx=1
 for dir in "$@"; do
-    pushd ./${dir} > /dev/null
+    pushd ./temp/${dir} > /dev/null
     > ${dir}.log
     if [ $idx -lt 5 ]; then
         echo "dog" >> "${dir}.log"
@@ -15,7 +15,7 @@ for dir in "$@"; do
     ((idx++))
 done
 
-cnt=`./dgrep dog *.log | grep dog | wc -l`
+cnt=`./../dgrep dog *.log | grep dog | wc -l`
 
 ./stop_nodes.sh > /dev/null
 if [ $cnt -eq 4 ]; then

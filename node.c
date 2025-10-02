@@ -27,29 +27,23 @@ int main(int argc, char **argv) {
         fprintf(f, "Client connected\n"); 
         fflush(f);
         size_t len;
-        char buf[1024];
-        net_recv_msg(connfd, buf, &len);
-        //fprintf(f, "grep arguments: %s\n", buf);
-        //fflush(f);
+        char *buf;
 
-        //TODO: run grep
-        //send grep results back to client
+        if (!net_recv_msg(connfd, malloc, &buf, &len)) {
+            net_disconnect(connfd);
+            continue; 
+        }
 
+        //run grep locally
         FILE * cmd = popen(buf, "r");
         if (cmd == NULL) {
+            net_disconnect(connfd);
             exit(1);
         }
-        /*
-        char result[1024];
-        result[0] = '\0';
-        size_t off = 0;
-        while (fgets(result + off, sizeof(result), cmd)) {
-            fprintf(f, "sizeof(result): %ld\n", sizeof(result)); 
-            fflush(f);
-            //off = strlen(result);
-            net_send_msg(connfd, result, strlen(result) + 1);
-        }
-        */
+
+        free(buf);
+
+        //read local grep results
         size_t capacity = 1024;
         char *result = malloc(capacity);
         result[0] = '\0';
@@ -61,8 +55,8 @@ int main(int argc, char **argv) {
                 result = realloc(result, capacity);
             }
         }
-            fprintf(f, "sizeof(result): %ld\n", size); 
-            fflush(f);
+
+        //send result back to client
         net_send_msg(connfd, result, size + 1);
         free(result);
         

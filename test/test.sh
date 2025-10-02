@@ -2,17 +2,20 @@
 
 #setup
 ./stop_nodes.sh > /dev/null 2>&1
+
+pushd ./../
 make clean > /dev/null
 make > /dev/null
+popd
 
-> medium_lorem_ipsum.txt
+> ./temp/medium_lorem_ipsum.txt
 for i in {1..10}; do
-    cat lorem_ipsum.txt >> medium_lorem_ipsum.txt
+    cat lorem_ipsum.txt >> ./temp/medium_lorem_ipsum.txt
 done
 
-> large_lorem_ipsum.txt
-for i in {1..100}; do
-    cat medium_lorem_ipsum.txt >> large_lorem_ipsum.txt
+> ./temp/large_lorem_ipsum.txt
+for i in {1..10}; do
+    cat ./temp/medium_lorem_ipsum.txt >> ./temp/large_lorem_ipsum.txt
 done
 
 total=0
@@ -77,7 +80,7 @@ echo "========Failed Nodes Test========"
 passed=$((passed + $?))
 ((total++))
 
-echo " "
+
 echo "========TOTAL PASSED========"
 echo "${passed}/${total}"
 

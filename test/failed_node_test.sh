@@ -4,14 +4,14 @@ kill $(lsof -ti :3000)
 
 idx=1
 for dir in "$@"; do
-    pushd ./${dir} > /dev/null
+    pushd ./temp/${dir} > /dev/null
     > ${dir}.log
     cat ./../medium_lorem_ipsum.txt > "${dir}.log"
     popd > /dev/null
     ((idx++))
 done
 
-cnt=`./dgrep Lorem *.log | grep Lorem | wc -l`
+cnt=`./../dgrep Lorem *.log | grep Lorem | wc -l`
 
 kill $(lsof -ti :3001)
 kill $(lsof -ti :3002)

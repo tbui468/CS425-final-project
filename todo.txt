@@ -1,17 +1,26 @@
-Push to git so that we have something to show in portfolio
+medium and large lorem ipsum should be put in temp directory
+
+Change remaining tests to use new system
+    ensure all 10 tests pass
+
+Have /test/temp added to gitignore
+Have medium and large lorem ipsum files generated/read from /test/temp
+Consider making large test a bit smaller (rather than 9000 instances, just have 900?)
+    this will make the test significantly faster
 
 Probably want to make a test directory since there are so many test files now
+    fix test system
+    should be able to run tests using make:
+        make (build executables)
+        make test (should go into the /test directory and run the test script there)
+        make clean (should clear the temp directory and all compiled executables)
 
-Make a script to run a single test
-    this makes it easier to debug a single node
-    could also have this script only active a single node
-
-Need to be able to run some tests only since bash scripts are breaking and it's hard to debug
-    #./dgrep Lorem *.log | grep Lorem | wc -l <---------this line medium-sized result test is failing
-    this crashes all 8 nodes - we know because trying to kill processes running on ports 3000-3007 fails since they already crashed
-
-Medium-Sized Result Test - this fails probably due to buffers being stack allocated and too small
-    for some reason the nodes are failing after the test runs (error messages when we try to manually shut them down)
-Large-Sized Result Test
-    probably should disable this since it could take a long time
-Failed Node Test
+Implement a membership protocol (let's try gossip style heartbeating with fail/delete and suspicion)
+    Consider looking at/using the API provided by the Coursera MP1 project
+    failure must be reflected at one node within 3 seconds
+        this requires heart-beating at least once per 1.5 seconds (if using 1.5 seconds for TFAIL and 1.5 seconds for TDELETE)
+    failure must be reflected in all nodes within 6 seconds
+    each machine must join with a version number (using fail-stop rather than fail-recovery model)
+    use UDP for membership messaging
+    log all joins, voluntary leaves and failures
+    Implement a way to drop messages on receiver end (default to 0%)

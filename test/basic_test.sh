@@ -1,7 +1,7 @@
 ./start_nodes.sh > /dev/null
 idx=1
 for dir in "$@"; do
-    pushd ./${dir} > /dev/null
+    pushd ./temp/${dir} > /dev/null
     > ${dir}.log
     for i in {1..10}; do
         if [ $idx -eq $i ]; then
@@ -15,7 +15,7 @@ for dir in "$@"; do
 done
 
 #./dgrep -E "\"Listening.*local|local.*Listening\"" *.log
-cnt=`./dgrep dog *.log | grep dog | wc -l`
+cnt=`./../dgrep dog *.log | grep dog | wc -l`
 
 ./stop_nodes.sh > /dev/null
 

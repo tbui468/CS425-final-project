@@ -3,7 +3,7 @@
 
 idx=1
 for dir in "$@"; do
-    pushd ./${dir} > /dev/null
+    pushd ./temp/${dir} > /dev/null
     > ${dir}.log
     cat ./../medium_lorem_ipsum.txt > "${dir}.log"
     for i in {1..10}; do
@@ -14,7 +14,7 @@ for dir in "$@"; do
     ((idx++))
 done
 
-cnt=`./dgrep dog *.log | grep dog | wc -l`
+cnt=`./../dgrep dog *.log | grep dog | wc -l`
 ./stop_nodes.sh > /dev/null
 if [ $cnt -eq 8 ]; then
     echo "Passed"

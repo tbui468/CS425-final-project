@@ -45,37 +45,17 @@ int main(int argc, char **argv) {
     strcat(grep_buf, "grep ");
     strcat(grep_buf, buf);
     
-    /*
-    FILE * cmd = popen(grep_buf, "r");
-    if (cmd == NULL) {
-        exit(1);
-    }
-    char result[1024];
-    while (fgets(result, sizeof(result), cmd)) {
-        printf("output: %s", result);
-    }
-    pclose(cmd); 
-    */
-
-    
     for (int i = 0; i < SERVER_COUNT; i++) {
         sockfds[i] = net_connect("localhost", ports[i]);
         printf("connected\n");
         if (sockfds[i] > 0) {
             size_t grep_len = strlen(grep_buf) + 1; //include \0
-        printf("sending msg\n");
-                fflush(stdout);
             net_send_msg(sockfds[i], grep_buf, (int) grep_len);
-        printf("sent message\n");
-                fflush(stdout);
 
-            //TODO: receive grep response and output
+            //receive grep response and output
             size_t len;
             char *buf;
-        printf("recving message\n");
-                fflush(stdout);
-            //if (net_recv_msg(sockfds[i], buf, &len)) {
-            if (net_alloc_recv_msg(sockfds[i], malloc, &buf, &len)) {
+            if (net_recv_msg(sockfds[i], malloc, &buf, &len)) {
                 printf("[localhost:%s]:\n%s", ports[i], buf);
                 fflush(stdout);
                 free(buf);
@@ -83,12 +63,10 @@ int main(int argc, char **argv) {
                 printf("Connection to [localhost:%s] ended\n", ports[i]);
                 fflush(stdout);
             }
-        printf("recved message\n");
-                fflush(stdout);
             net_disconnect(sockfds[i]);
         } else {
             printf("Failed to connect to [localhost:%s]\n", ports[i]);
-                fflush(stdout);
+            fflush(stdout);
         }
     }
 
