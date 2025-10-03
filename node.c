@@ -4,11 +4,12 @@
 #include <assert.h>
 #include "net.h"
 #include "msg.h"
+#include "arena.h"
 
 #define INTRODUCER_PORT "3000"
 
 struct member {
-    char *port;
+    char port[4];
 };
 
 size_t member_serialized_size() {
@@ -28,7 +29,7 @@ void member_list_init(struct member_list *list) {
 }
 
 void member_list_append(struct member_list *list, struct member *member) {
-    assert(list->count < 8);
+    assert(list->count < list->capacity);
 
     list->values[list->count] = *member;
     list->count++;
@@ -40,10 +41,10 @@ void member_list_print(struct member_list *list) {
     }
 }
 
-size_t member_list_serialize(struct member_list *list, char **out_buf) {
+size_t member_list_serialize(struct member_list *list, char **out_buf, struct arena *arena) {
     uint32_t count = list->count;
     size_t size = sizeof(uint32_t) + count * member_serialized_size();
-    char *buf = malloc(size);
+    char *buf = arena_malloc(arena, size);
     memcpy(buf, &count, sizeof(uint32_t));
     for (int i = 0; i < list->count; i++) {
         memcpy(buf + sizeof(uint32_t) + i * member_serialized_size(), list->values[i].port, 4);
@@ -65,7 +66,6 @@ void member_list_deserialize(struct member_list *list, char *buf, size_t len) {
     list->values = malloc(sizeof(struct member) * list->capacity);
    
     for (int i = 0; i < count; i++) {
-        list->values[i].port = malloc(4);
         memcpy(list->values[i].port, buf + sizeof(uint32_t) + i * member_serialized_size(), 4);
     }  
 }
@@ -93,6 +93,9 @@ void *node_listen(void *arg) {
     fprintf(f, "Listening on [localhost:%s]\n", node->port);
     fflush(f);
 
+    struct arena arena;
+    arena_init(&arena, malloc, realloc, free);
+
     while (true) {
         int connfd = net_accept(serverfd);
         if (connfd == -1)
@@ -102,7 +105,7 @@ void *node_listen(void *arg) {
 
         struct msg msg;
         msg.sockfd = connfd;
-        if (!node_recv_msg(&msg)) {
+        if (!node_recv_msg(&msg, &arena)) {
             net_disconnect(connfd);
             continue; 
         }
@@ -119,18 +122,16 @@ void *node_listen(void *arg) {
                 exit(1);
             }
 
-            free(msg.buf);
-
             //read local grep results
             size_t capacity = 1024;
-            char *result = malloc(capacity);
+            char *result = arena_malloc(&arena, capacity);
             result[0] = '\0';
             size_t size = strlen(result);
             while (fgets(result + size, capacity - size, cmd)) {
                 size = strlen(result);
                 if (size == capacity - 1) {
                     capacity *= 2;
-                    result = realloc(result, capacity);
+                    result = arena_realloc(&arena, result, capacity);
                 }
             }
 
@@ -143,7 +144,6 @@ void *node_listen(void *arg) {
             res_msg.buf = result;
             res_msg.len = size + 1;
             node_send_msg(&res_msg);
-            free(result);
             
             break;
         }
@@ -164,14 +164,12 @@ void *node_listen(void *arg) {
             */
             struct member member;
             assert(msg.len == 4);
-            member.port = malloc(msg.len);
             memcpy(member.port, msg.buf, msg.len);
             member_list_append(&node->members, &member);
-            res_msg.len = member_list_serialize(&node->members, &res_msg.buf);
+            res_msg.len = member_list_serialize(&node->members, &res_msg.buf, &arena);
             printf("done serializing\n");
             node_send_msg(&res_msg);
             printf("done sending\n");
-            free(res_msg.buf);
             break;
         }
         case MT_JOIN_RES:
@@ -180,6 +178,8 @@ void *node_listen(void *arg) {
 
         
         net_disconnect(connfd);
+
+        arena_dealloc_all(&arena);
     }
 }
 
@@ -190,9 +190,13 @@ bool is_introducer(const char *port) {
 int main(int argc, char **argv) {
     assert(argc == 2);
 
+
+
     struct node node;
     node.port = argv[1];
     node.members.values = NULL;
+    struct arena arena;
+    arena_init(&arena, malloc, realloc, free);
 
     if (!is_introducer(argv[1])) {
         //TODO: put this in loop to allow retrying if introducer fails
@@ -202,27 +206,27 @@ int main(int argc, char **argv) {
         struct msg introduction;
         introduction.sockfd = introducer_sockfd;
         introduction.type = MT_JOIN_REQ;
-        introduction.buf = strdup(argv[1]);
+        introduction.buf = arena_strdup(&arena, argv[1]);
         introduction.len = strlen(introduction.buf);
         node_send_msg(&introduction);
-        free(introduction.buf);
 
         struct msg reply;
         reply.sockfd = introducer_sockfd;
-        assert(node_recv_msg(&reply));
+        assert(node_recv_msg(&reply, &arena));
         assert(reply.type == MT_JOIN_RES);
         member_list_deserialize(&node.members, reply.buf, reply.len);
         member_list_print(&node.members);
-        free(reply.buf);
         
         net_disconnect(introducer_sockfd);
     } else {
         struct member member;
-        member.port = strdup(argv[1]);
-
+        assert(strlen(argv[1]) == 4);
+        memcpy(member.port, argv[1], 4);
         member_list_init(&node.members);
         member_list_append(&node.members, &member);
     }
+
+    arena_dealloc_all(&arena);
 
     //start listening for gossip
     pthread_t listener_thread;

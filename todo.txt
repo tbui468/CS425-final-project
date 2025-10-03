@@ -1,8 +1,3 @@
-Members are introducing themselves to introducer and getting the initial membership list
-    but the code is messy - clean this up
-
-    Use a memory arena to easily free memory
-    that should vastly simplify things
 
 
 Implement gossip so that members get updated list of members eventually

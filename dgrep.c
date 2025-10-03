@@ -3,6 +3,7 @@
 #include <assert.h>
 #include "net.h"
 #include "msg.h"
+#include "arena.h"
 
 #define SERVER_COUNT 8
 
@@ -50,6 +51,10 @@ int main(int argc, char **argv) {
     send_msg.len = strlen(grep_buf) + 1; //include \0
     send_msg.buf = grep_buf;
     send_msg.type = MT_DGREP;
+
+    struct arena arena;
+    arena_init(&arena, malloc, realloc, free);
+    
     
     for (int i = 0; i < SERVER_COUNT; i++) {
         sockfds[i] = net_connect("localhost", ports[i]);
@@ -61,10 +66,9 @@ int main(int argc, char **argv) {
 
             struct msg msg;
             msg.sockfd = sockfds[i];
-            if (node_recv_msg(&msg)) {
+            if (node_recv_msg(&msg, &arena)) {
                 printf("[localhost:%s]:\n%s", ports[i], msg.buf);
                 fflush(stdout);
-                free(msg.buf);
             } else {
                 printf("Connection to [localhost:%s] ended\n", ports[i]);
                 fflush(stdout);
