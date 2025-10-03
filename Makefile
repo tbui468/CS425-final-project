@@ -10,10 +10,10 @@ all: client server
 	./test/temp/machine.3006 \
 	./test/temp/machine.3007
 
-client: dgrep.c
+client: dgrep.c msg.h net.h
 	gcc -o dgrep dgrep.c
 
-server: node.c
+server: node.c msg.h net.h
 	gcc -o node node.c
 
 clean:

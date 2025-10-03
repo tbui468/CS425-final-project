@@ -1,19 +1,70 @@
-medium and large lorem ipsum should be put in temp directory
+Members are introducing themselves to introducer and getting the initial membership list
+    but the code is messy - clean this up
 
-Change remaining tests to use new system
-    ensure all 10 tests pass
+    Use a memory arena to easily free memory
+    that should vastly simplify things
 
-Have /test/temp added to gitignore
-Have medium and large lorem ipsum files generated/read from /test/temp
-Consider making large test a bit smaller (rather than 9000 instances, just have 900?)
-    this will make the test significantly faster
 
-Probably want to make a test directory since there are so many test files now
-    fix test system
-    should be able to run tests using make:
-        make (build executables)
-        make test (should go into the /test directory and run the test script there)
-        make clean (should clear the temp directory and all compiled executables)
+Implement gossip so that members get updated list of members eventually
+
+
+Use a pair of memory arenas to handle receiving message and handling messages
+    listener allocates memory using one arena
+    handler handles messages and frees arena when done
+    swap arenas to allow easy memory management
+
+    Have two queues (each with its own memory arena).  Then lock/swap/free them
+
+Listening thread should put messages in a queue and let different thread (eg, main thread) handle the actual messages
+
+    struct msg_queue {
+        struct msg *values;
+        int count;
+        int capacity; 
+        //TODO: add a lock here
+    };
+
+    void msg_queue_init(struct msg_queue *queue) {
+
+    }
+
+    void msg_queue_enqueue(struct msg_queue *queue, struct msg *msg) {
+        //lock 
+        append
+        //unlock
+    }
+
+    bool msg_queue_dequeue(struct msg_queue *queue, struct msg **msg) {
+        //lock
+        remove element
+        //unlock
+        set msg out
+    }
+
+
+A node introduces itself to introducer
+    uses tcp socket to connect to introducer
+    introducer adds requester to own membership list
+    introducer sends requester membership list
+    end tcp connection
+
+    Need to make a tagged union to handle different message types
+        MT_DGREP
+        MT_JOIN_REQ
+        MT_JOIN_RES
+
+Membership protocol
+    introducer and new nodes use tcp to make initial connection
+    this allows introducer to update its own membership list and new node to get the initial membership list
+    after this, at intervals the gossip protocol should occur (including the introducer) using a UDP connection
+    will need to add UDP sockets to net.h
+
+Each node will keep an array of messages it receives and reads them when necessary
+    this allows us to not worry about connections (and to use UDP)
+
+Nodes send messages to eachother at at set time interval
+Nodes maintain a list of know members to gossip with
+A single node is the introduce (port 3000), and all nodes first gossip with this node on startup
 
 Implement a membership protocol (let's try gossip style heartbeating with fail/delete and suspicion)
     Consider looking at/using the API provided by the Coursera MP1 project
@@ -24,3 +75,6 @@ Implement a membership protocol (let's try gossip style heartbeating with fail/d
     use UDP for membership messaging
     log all joins, voluntary leaves and failures
     Implement a way to drop messages on receiver end (default to 0%)
+
+Implement distributed system visualizer using SDL3
+    Use logs to replay nodes leaving/entering???? and detection

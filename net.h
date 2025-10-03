@@ -1,3 +1,6 @@
+#ifndef NET_H
+#define NET_H
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -105,7 +108,7 @@ bool net_recv(int sockfd, char* buf, int len) {
     return true;
 }
 
-bool net_recv_msg(int sockfd, void* (allocator)(size_t), char **out_buf, size_t *len) {
+bool net_recv_msg(int sockfd, void* (*allocator)(size_t), char **out_buf, size_t *len) {
     uint32_t fixed_len;
     if (!net_recv(sockfd, (char *) &fixed_len, sizeof(uint32_t))) {
         return false;
@@ -197,3 +200,5 @@ int net_accept(int sockfd) {
 
     return client_fd;
 }
+
+#endif //NET_H
