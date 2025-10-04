@@ -8,6 +8,7 @@
 
 #define INTRODUCER_PORT "3000"
 
+
 struct member {
     char port[4];
 };
@@ -152,16 +153,7 @@ void *node_listen(void *arg) {
             res_msg.type = MT_JOIN_RES;
             res_msg.sockfd = connfd;
             printf("serializing\n");
-            //TODO: get port of requester and add to own membership list
-            /*
-            struct sockaddr_in sa;
-            socklen_t l = sizeof(sa);
-            if (getpeername(connfd, (struct sockaddr *) &sa, &l) == -1) {
 
-            } else {
-                printf("remote port: %d\n", ntohs(sa.sin_port));
-            }
-            */
             struct member member;
             assert(msg.len == 4);
             memcpy(member.port, msg.buf, msg.len);

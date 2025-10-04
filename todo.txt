@@ -1,41 +1,32 @@
+Make messaging fire-and-forget rather than requiring a response immediately after getting a message
+    test out fire-and-forget by using the msg->port field to store address of dst
+    when a message of sent, the sender 
+
+    Will need to modify dgrep to give it a hardcoded listening port???
+    current system has dgrep wait for a response immediately after sending request
+    could use the same queue system for dgrep.  Then have dgrep listen on a port until it hears
+    a reply from all nodes OR a timeout occurs
+
+    Could test the msg_queue with dgrep first
 
 
-Implement gossip so that members get updated list of members eventually
+Before we can use queue (which splits recv and sending messages into different threads)
+    need sender to also send the listening port.
+    this should be included in msg.  struct msg should NOT include the sockfd anymore since we don't want to worry about this
+    when dealing at the node level - ip address should be enough
 
+Implement msg_queue and use one of these instead of current arena
+    keep a copy of global arena, but rename it global arena.  This is used for all other allocations that must persist through entire lifetime
+        of node (just member_list for now...?)
+    any other temporary allocations can from either msg_queue (including most temporary allocations?)
+    
+Listener will recv message using a queue (which has a private memory allocator)
+Main thread will use a different queue (with its own private memory allocator) to respond to messages
+    when main thread is done handling all message in queue (which is should have exclusive access to)
+    it will deallocate all memory, and then lock both queues and swap them
 
-Use a pair of memory arenas to handle receiving message and handling messages
-    listener allocates memory using one arena
-    handler handles messages and frees arena when done
-    swap arenas to allow easy memory management
-
-    Have two queues (each with its own memory arena).  Then lock/swap/free them
-
-Listening thread should put messages in a queue and let different thread (eg, main thread) handle the actual messages
-
-    struct msg_queue {
-        struct msg *values;
-        int count;
-        int capacity; 
-        //TODO: add a lock here
-    };
-
-    void msg_queue_init(struct msg_queue *queue) {
-
-    }
-
-    void msg_queue_enqueue(struct msg_queue *queue, struct msg *msg) {
-        //lock 
-        append
-        //unlock
-    }
-
-    bool msg_queue_dequeue(struct msg_queue *queue, struct msg **msg) {
-        //lock
-        remove element
-        //unlock
-        set msg out
-    }
-
+    This system also makes it easier to handle tcp/udp connections in the same way - queue the msg and handle them later in a function
+    dedicated to doing so.  This might be slower than resusing a connection... but it would be simplier...
 
 A node introduces itself to introducer
     uses tcp socket to connect to introducer

@@ -54,7 +54,9 @@ int main(int argc, char **argv) {
 
     struct arena arena;
     arena_init(&arena, malloc, realloc, free);
-    
+
+    //TODO: make a listening thread on port
+    //TODO: send dgrep requests to nodes
     
     for (int i = 0; i < SERVER_COUNT; i++) {
         sockfds[i] = net_connect("localhost", ports[i]);
