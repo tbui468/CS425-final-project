@@ -1,28 +1,6 @@
-Tests run fine now (no they don't).  Still hangs sometimes
-    could try to run similar test on the practice programs (server.c and client.c) to
-    see if its an issue with the grepping or something else
+Remove practice directory since this code is merged with main project now
 
-    Alternatively, could try to rewrite dgrep.c and node.c to simplify
-    the code (using the queue to split up recving/handling messages)
-
-    Use a queue in dgrep.c and node.c to simplify receiving and handling messages
-    Problem should make a new function called recv_msgs that
-
-
-    Put this in msg.h so that node.c and dgrep.c can both use it
-
-        void *recv_msgs(void *arg) {
-            int serverfd = net_listen(arg);
-
-            while (true) {
-                struct msg msg;
-                if (node_recv_msg(serverfd, &handler_queue->arena, &msg)) {
-                    msg_queue_enqueue(handler_queue, &msg);
-                }
-            }
-        }
-
-
+Commit
 
 A node introduces itself to introducer
     uses tcp socket to connect to introducer

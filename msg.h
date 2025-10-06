@@ -107,7 +107,8 @@ bool node_send_msg(struct msg *msg, struct arena *arena) {
         int sockfd = net_connect("localhost", buf);
         if (sockfd <= 0) {
             attempts++;
-            usleep(100000); //0.1 seconds
+            //usleep(100000); //0.1 seconds
+            usleep(50000); //0.05 seconds
             continue;
         }
 
