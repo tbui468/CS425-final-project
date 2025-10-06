@@ -1,0 +1,7 @@
+commit
+
+Actually pass it the grep arguments rather than just checking for 'cat' in all logs
+
+
+Add in UDP connections
+    they should use the same msg_queue to queue messages to handle later

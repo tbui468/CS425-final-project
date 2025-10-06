@@ -1,32 +1,28 @@
-Make messaging fire-and-forget rather than requiring a response immediately after getting a message
-    test out fire-and-forget by using the msg->port field to store address of dst
-    when a message of sent, the sender 
+Tests run fine now (no they don't).  Still hangs sometimes
+    could try to run similar test on the practice programs (server.c and client.c) to
+    see if its an issue with the grepping or something else
 
-    Will need to modify dgrep to give it a hardcoded listening port???
-    current system has dgrep wait for a response immediately after sending request
-    could use the same queue system for dgrep.  Then have dgrep listen on a port until it hears
-    a reply from all nodes OR a timeout occurs
+    Alternatively, could try to rewrite dgrep.c and node.c to simplify
+    the code (using the queue to split up recving/handling messages)
 
-    Could test the msg_queue with dgrep first
+    Use a queue in dgrep.c and node.c to simplify receiving and handling messages
+    Problem should make a new function called recv_msgs that
 
 
-Before we can use queue (which splits recv and sending messages into different threads)
-    need sender to also send the listening port.
-    this should be included in msg.  struct msg should NOT include the sockfd anymore since we don't want to worry about this
-    when dealing at the node level - ip address should be enough
+    Put this in msg.h so that node.c and dgrep.c can both use it
 
-Implement msg_queue and use one of these instead of current arena
-    keep a copy of global arena, but rename it global arena.  This is used for all other allocations that must persist through entire lifetime
-        of node (just member_list for now...?)
-    any other temporary allocations can from either msg_queue (including most temporary allocations?)
-    
-Listener will recv message using a queue (which has a private memory allocator)
-Main thread will use a different queue (with its own private memory allocator) to respond to messages
-    when main thread is done handling all message in queue (which is should have exclusive access to)
-    it will deallocate all memory, and then lock both queues and swap them
+        void *recv_msgs(void *arg) {
+            int serverfd = net_listen(arg);
 
-    This system also makes it easier to handle tcp/udp connections in the same way - queue the msg and handle them later in a function
-    dedicated to doing so.  This might be slower than resusing a connection... but it would be simplier...
+            while (true) {
+                struct msg msg;
+                if (node_recv_msg(serverfd, &handler_queue->arena, &msg)) {
+                    msg_queue_enqueue(handler_queue, &msg);
+                }
+            }
+        }
+
+
 
 A node introduces itself to introducer
     uses tcp socket to connect to introducer

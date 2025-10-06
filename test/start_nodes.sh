@@ -34,3 +34,6 @@ popd
 pushd ./temp/machine.3007
 ./../../../node 3007 &
 popd
+
+#sleep to give nodes to start up
+sleep 0.1
