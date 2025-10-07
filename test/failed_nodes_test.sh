@@ -1,5 +1,5 @@
-./start_nodes.sh > /dev/null
-./stop_nodes.sh > /dev/null
+#./start_nodes.sh > /dev/null
+#./stop_nodes.sh > /dev/null
 
 idx=1
 for dir in "$@"; do

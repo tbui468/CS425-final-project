@@ -18,9 +18,9 @@ const char *ports[SERVER_COUNT] = {
 
 struct msg_queue *msg_queue;
 
-void set_complete_status(struct string port) {
+void set_complete_status(struct port *port) {
     for (int i = 0; i < SERVER_COUNT; i++) {
-        if (memcmp(ports[i], port.ptr, port.len) == 0) {
+        if (memcmp(ports[i], port->ptr, port->len) == 0) {
             complete[i] = true;
             break;
         }
@@ -38,8 +38,8 @@ void set_complete_status(struct string port) {
 void handle_msg(struct msg *msg) {
     switch (msg->type) {
     case MT_GREP_RES: {
-        printf("[%.*s]:\n%.*s", (int) msg->src_port.len, msg->src_port.ptr, (int) msg->payload.len, msg->payload.ptr);
-        set_complete_status(msg->src_port);
+        printf("[%.*s]:\n%.*s", (int) msg->src.len, msg->src.ptr, (int) msg->payload.len, msg->payload.ptr);
+        set_complete_status(&msg->src);
 
         break;  
     }
@@ -112,12 +112,13 @@ int main(int argc, char **argv) {
     for (int i = 0; i < SERVER_COUNT; i++) {
         struct msg msg;
         msg.type = MT_GREP_REQ;
-        msg.src_port = string_from_cstring(LISTENING_PORT, &msg_queue->arena);
-        msg.dst_port = string_from_cstring(ports[i], &msg_queue->arena);
+        msg.src = (struct port) { .ptr=LISTENING_PORT, .len=strlen(LISTENING_PORT) };
+        msg.dst = (struct port) { .len=strlen(ports[i]) };
+        memcpy(msg.dst.ptr, ports[i], msg.dst.len);
         msg.payload = (struct string) { .ptr = grep_buf, .len = grep_len };
         if (!node_send_msg(&msg, &msg_queue->arena)) {
             printf("failed to connect\n");
-            set_complete_status(msg.dst_port);
+            set_complete_status(&msg.dst);
         } else {
             printf("connected\n");
         }

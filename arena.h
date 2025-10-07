@@ -176,12 +176,4 @@ static void *arena_realloc(struct arena *arena, void *ptr, size_t size)  {
     return new_ptr;
 }
 
-char *arena_strdup(struct arena *arena, const char *s) {
-    size_t len = strlen(s);
-    char *p = arena_malloc(arena, len + 1);
-    memcpy(p, s, len);
-    p[len] = '\0';
-    return p;
-}
-
 #endif //ARENA_H

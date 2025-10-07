@@ -8,6 +8,11 @@
 #include "net.h"
 #include "string.h"
 
+struct port {
+    char ptr[5];
+    size_t len;
+};
+
 enum msg_type {
     MT_GREP_REQ,
     MT_GREP_RES,
@@ -18,27 +23,27 @@ enum msg_type {
 struct msg {
     enum msg_type type;
     int sockfd; 
-    struct string src_port;
-    struct string dst_port;
+    struct port src;
+    struct port dst;
     struct string payload;
 };
 
 void print_msg(struct msg *msg) {
     printf("Type: %d\n", msg->type);
-    printf("Src: %.*s\n", (int) msg->src_port.len, msg->src_port.ptr);
-    printf("Dst: %.*s\n", (int) msg->dst_port.len, msg->dst_port.ptr);
+    printf("Src: %.*s\n", (int) msg->src.len, msg->src.ptr);
+    printf("Dst: %.*s\n", (int) msg->dst.len, msg->dst.ptr);
     printf("Payload: %.*s\n", (int) msg->payload.len, msg->payload.ptr);
 }
 
 void msg_copy(const struct msg *msg, struct arena *arena, struct msg *copy) {
     copy->type = msg->type;
     copy->sockfd = msg->sockfd;
-    copy->src_port = string_dup(&msg->src_port, arena);
-    copy->dst_port = string_dup(&msg->dst_port, arena);
+    copy->src = msg->src;
+    copy->dst = msg->dst;
     copy->payload = string_dup(&msg->payload, arena);
 }
 
-static char *append_to_buf(char *buf, void *ptr, size_t len) {
+static char *append_to_buf(char *buf, const void *ptr, size_t len) {
     memcpy(buf, ptr, len);
     return buf + len;
 }
@@ -48,21 +53,21 @@ static char *append_to_buf(char *buf, void *ptr, size_t len) {
 //strings: src_port, dst_port, payload
 size_t msg_serialize(const struct msg *msg, struct arena *arena, char **out_buf) {
     uint8_t msg_type = msg->type;
-    uint32_t src_size = msg->src_port.len;
-    uint32_t dst_size = msg->dst_port.len;
+    uint8_t src_size = msg->src.len;
+    uint8_t dst_size = msg->dst.len;
     uint32_t payload_size = msg->payload.len;
-                          //total size       type              //src,dst,payload
-    uint32_t total_size = sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint32_t) * 3 + src_size + dst_size + payload_size;
+                          //total size       type,src,dst          payload
+    uint32_t total_size = sizeof(uint32_t) + sizeof(uint8_t) * 3 + sizeof(uint32_t) + src_size + dst_size + payload_size;
 
     char *buf = arena_malloc(arena, total_size);
     *out_buf = buf;
 
     buf = append_to_buf(buf, &total_size, sizeof(uint32_t));
     buf = append_to_buf(buf, &msg_type, sizeof(uint8_t));
-    buf = append_to_buf(buf, &src_size, sizeof(uint32_t));
-    buf = append_to_buf(buf, msg->src_port.ptr, src_size);
-    buf = append_to_buf(buf, &dst_size, sizeof(uint32_t));
-    buf = append_to_buf(buf, msg->dst_port.ptr, dst_size);
+    buf = append_to_buf(buf, &src_size, sizeof(uint8_t));
+    buf = append_to_buf(buf, &msg->src.ptr[0], src_size);
+    buf = append_to_buf(buf, &dst_size, sizeof(uint8_t));
+    buf = append_to_buf(buf, &msg->dst.ptr[0], dst_size);
     buf = append_to_buf(buf, &payload_size, sizeof(uint32_t));
     buf = append_to_buf(buf, msg->payload.ptr, payload_size);
 
@@ -75,16 +80,16 @@ bool msg_deserialize_resource(char *buf, struct msg *msg) {
     buf += sizeof(uint8_t);
     msg->type = msg_type;
 
-    uint32_t src_size = *((uint32_t*) buf );
-    buf += sizeof(uint32_t);
-    msg->src_port.len = src_size;
-    msg->src_port.ptr = buf;
+    uint8_t src_size = *((uint8_t*) buf );
+    buf += sizeof(uint8_t);
+    msg->src.len = src_size;
+    memcpy(msg->src.ptr, buf, msg->src.len);
     buf += src_size;    
 
-    uint32_t dst_size = *((uint32_t*) buf );
-    buf += sizeof(uint32_t);
-    msg->dst_port.len = dst_size;
-    msg->dst_port.ptr = buf;
+    uint8_t dst_size = *((uint8_t*) buf );
+    buf += sizeof(uint8_t);
+    msg->dst.len = dst_size;
+    memcpy(msg->dst.ptr, buf, msg->dst.len);
     buf += dst_size;    
 
     uint32_t payload_size = *((uint32_t*) buf );
@@ -99,8 +104,8 @@ bool msg_deserialize_resource(char *buf, struct msg *msg) {
 
 bool node_send_msg(struct msg *msg, struct arena *arena) {
     char buf[8];
-    memcpy(buf, msg->dst_port.ptr, msg->dst_port.len);
-    buf[msg->dst_port.len] = '\0';
+    memcpy(buf, msg->dst.ptr, msg->dst.len);
+    buf[msg->dst.len] = '\0';
 
     int attempts = 0;
     while (attempts < 4) {
@@ -115,20 +120,6 @@ bool node_send_msg(struct msg *msg, struct arena *arena) {
         char *serialized_msg;
         size_t msg_size = msg_serialize(msg, arena, &serialized_msg);
         net_send(sockfd, serialized_msg, msg_size);
-
-        /*
-        uint8_t fixed_type = (uint8_t) msg->type;
-        uint32_t fixed_len = (uint32_t) msg->len;
-        net_send(sockfd, (char *) &fixed_type, sizeof(uint8_t));
-        uint8_t src_port_len = msg->src_port.len;
-        net_send(sockfd, &src_port_len, sizeof(uint8_t));
-        net_send(sockfd, msg->src_port.ptr, msg->src_port.len);
-        uint8_t dst_port_len = msg->dst_port.len;
-        net_send(sockfd, &dst_port_len, sizeof(uint8_t));
-        net_send(sockfd, msg->dst_port.ptr, msg->dst_port.len);
-        net_send(sockfd, (char *) &fixed_len, sizeof(uint32_t));
-        net_send(sockfd, msg->buf, msg->len); 
-        */
 
         net_disconnect(sockfd);
         return true;
@@ -158,53 +149,6 @@ bool node_recv_msg(int listenerfd, struct arena *arena, struct msg *msg) {
 
     assert(msg_deserialize_resource(buf, msg));
 
-    /*
-
-    uint8_t fixed_type;
-    if (!net_recv(connfd, (char *) &fixed_type, sizeof(uint8_t))) {
-        net_disconnect(connfd);
-        return false;
-    }
-
-    uint8_t src_port_len;
-    if (!net_recv(connfd, (char *) &src_port_len, sizeof(uint8_t))) {
-        net_disconnect(connfd);
-        return false;
-    }
-    msg->src_port.len = src_port_len;
-    msg->src_port.ptr = arena_malloc(arena, msg->src_port.len);
-    if (!net_recv(connfd, msg->src_port.ptr, msg->src_port.len)) {
-        net_disconnect(connfd);
-        return false;
-    }
-
-    uint8_t dst_port_len;
-    if (!net_recv(connfd, (char *) &dst_port_len, sizeof(uint8_t))) {
-        net_disconnect(connfd);
-        return false;
-    }
-
-    msg->dst_port.len = dst_port_len;
-    msg->dst_port.ptr = arena_malloc(arena, msg->dst_port.len);
-    if (!net_recv(connfd, msg->dst_port.ptr, msg->dst_port.len)) {
-        net_disconnect(connfd);
-        return false;
-    }
-
-    uint32_t fixed_len;
-    if (!net_recv(connfd, (char *) &fixed_len, sizeof(uint32_t))) {
-        net_disconnect(connfd);
-        return false;
-    }
-
-    msg->type = (enum msg_type) fixed_type;
-    msg->len = (size_t) fixed_len;
-    msg->buf = arena_malloc(arena, msg->len);
-    if (!net_recv(connfd, msg->buf, msg->len)) {
-        net_disconnect(connfd);
-        return false;
-    }
-    */
 
     net_disconnect(connfd);
     return true;

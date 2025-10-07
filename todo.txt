@@ -1,17 +1,16 @@
-Remove practice directory since this code is merged with main project now
-
-Commit
-
 A node introduces itself to introducer
     uses tcp socket to connect to introducer
-    introducer adds requester to own membership list
+    introducer adds requester to own membership list (which should already contain itself as a member)
     introducer sends requester membership list
     end tcp connection
 
-    Need to make a tagged union to handle different message types
-        MT_DGREP
-        MT_JOIN_REQ
-        MT_JOIN_RES
+Test UDP listener the same port as TCP listener
+    have nodes send datagram packets to members (except self) to see if they arrive correctly
+
+Gossiper
+    start a new thread that contains a single while loop with a sleep function called inside
+    this function wakes up every 1 second or so
+    updates its own heartbeat counter, and then UDPs this list to a random neighbor (or round robin)
 
 Membership protocol
     introducer and new nodes use tcp to make initial connection

@@ -1,6 +1,4 @@
-./start_nodes.sh > /dev/null
-
-kill $(lsof -ti :3000)
+./start_some_nodes.sh > /dev/null
 
 idx=1
 for dir in "$@"; do
@@ -11,9 +9,10 @@ for dir in "$@"; do
     ((idx++))
 done
 
+
 cnt=`./../dgrep Lorem *.log | grep Lorem | wc -l`
 
-kill $(lsof -ti :3001)
+kill $(lsof -ti :3000)
 kill $(lsof -ti :3002)
 kill $(lsof -ti :3003)
 kill $(lsof -ti :3004)
