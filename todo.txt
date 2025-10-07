@@ -1,9 +1,3 @@
-A node introduces itself to introducer
-    uses tcp socket to connect to introducer
-    introducer adds requester to own membership list (which should already contain itself as a member)
-    introducer sends requester membership list
-    end tcp connection
-
 Test UDP listener the same port as TCP listener
     have nodes send datagram packets to members (except self) to see if they arrive correctly
 

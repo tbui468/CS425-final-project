@@ -66,7 +66,6 @@ size_t member_serialize(const struct member *member, struct arena *arena, char *
 
 size_t member_deserialize(char *buf, struct member *member) {
     uint8_t len = *((uint8_t*) buf);
-    printf("len: %d\n", len);
     member->port.len = len;
     memcpy(member->port.ptr, buf + sizeof(uint8_t), member->port.len);
     return sizeof(uint8_t) + sizeof(member->port.ptr);
@@ -168,12 +167,23 @@ void handle_msg(struct msg *msg) {
         break;
     }
     case MT_JOIN_REQ: {
-        //TODO: add requester to own membership list, and send membership list (as MT_JOIN_RES) here
+        struct member member = { .port=msg->src };
+        member_list_append(g_member_list, &member);
+        member_list_print(g_member_list);
+        char *buf;
+        size_t size = member_list_serialize(g_member_list, &msg_queue->arena, &buf);
+        struct msg res_msg = { .type=MT_JOIN_RES, .src=msg->dst, .dst=msg->src, .payload=(struct string) { .ptr=buf, .len=size } };
+        if (!node_send_msg(&res_msg, &msg_queue->arena)) {
+            printf("failed to connect\n");
+        } else {
+            printf("sent response\n");
+        }
         break;
     }
 
     case MT_JOIN_RES: {
-        //TODO: get membership list and set own list here
+        member_list_deserialize(msg->payload.ptr, g_member_list);
+        member_list_print(g_member_list);
         break;
     }
     default:
