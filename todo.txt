@@ -1,17 +1,9 @@
-Nodes should periodically attempt to connect to the introducer peer in case it fails
-    nodes need to introduce themselves back to introducer to ensure partitions don't develop
-    the tcp code that runs in main function of node.c can be repurposed for this
-
-    Make an introducer thread that periodically sends TCP messages to introducer
-        this should run once on startup to get node's initial peers
-        make this sum set minimum time T_INTRODUCE + random integer amount to ensure
-        introducer is not overloaded
-
-        make this thread sleep T_INTRODUCER + random amount, and wake up periodically to check introducer
-
 write script to start introducer and 7 other nodes to test more quickly
     need a way to ending processes on certain ports to test failure
     make a script that works like this: ./stop_node 3002
+
+need to be careful with serializing and deserializing struct member
+    should be allocating string string payload
 
 write membership tests
     peer joins successfully

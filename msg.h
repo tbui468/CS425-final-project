@@ -8,6 +8,8 @@
 #include "net.h"
 #include "string.h"
 
+typedef uint16_t port_t;
+
 struct port {
     char ptr[5];
     size_t len;
@@ -27,7 +29,6 @@ enum msg_type {
 
 struct msg {
     enum msg_type type;
-    int sockfd; 
     struct port src;
     struct port dst;
     struct string payload;
@@ -42,7 +43,6 @@ void print_msg(struct msg *msg) {
 
 void msg_copy(const struct msg *msg, struct arena *arena, struct msg *copy) {
     copy->type = msg->type;
-    copy->sockfd = msg->sockfd;
     copy->src = msg->src;
     copy->dst = msg->dst;
     copy->payload = string_dup(&msg->payload, arena);

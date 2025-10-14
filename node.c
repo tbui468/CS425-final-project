@@ -6,6 +6,7 @@
 #define T_FAIL 32
 #define T_CLEANUP T_FAIL * 2
 #define T_GOSSIP 100000
+#define T_INTRODUCER_MSG 30
 
 static inline bool is_introducer(struct port *port) {
     return memcmp(port->ptr, INTRODUCER_PORT, strlen(INTRODUCER_PORT)) == 0;
@@ -161,27 +162,11 @@ size_t member_serialize(const struct member *member, struct arena *arena, char *
     
     *out_buf = buf;
     return size;
-    /*
-    size_t size = sizeof(uint8_t) + sizeof(member->port.ptr);
-    char *buf = arena_malloc(arena, size);
-    uint8_t len = member->port.len;
-    memcpy(buf, &len, sizeof(uint8_t));
-    memcpy(buf + sizeof(uint8_t), member->port.ptr, sizeof(member->port.ptr));
-    
-    *out_buf = buf;
-    return size;
-    */
 }
 
 size_t member_deserialize(char *buf, struct member *member) {
     memcpy(member, buf, sizeof(struct member));
     return sizeof(struct member);
-    /*
-    uint8_t len = *((uint8_t*) buf);
-    member->port.len = len;
-    memcpy(member->port.ptr, buf + sizeof(uint8_t), member->port.len);
-    return sizeof(uint8_t) + sizeof(member->port.ptr);
-    */
 }
 
 size_t member_serialized_size(struct arena *arena) {
@@ -236,6 +221,21 @@ void member_list_deserialize(char *buf, struct member_list *list) {
         struct member member;
         buf += member_deserialize(buf, &member);
         member_list_append(list, &member);
+    }
+}
+
+void *introducer_messager(void *arg) {
+    while (true) {
+        struct port introducer_port = get_introducer();
+        char *buf;
+        size_t size = member_list_serialize(g_member_list, &msg_queue->arena, &buf);
+        struct string payload = { .ptr=buf, .len=size };
+        struct msg msg = { .type=MT_JOIN_REQ, .src=g_port, .dst=introducer_port, .payload=payload };
+        if (!node_send_msg(&msg, &msg_queue->arena)) {
+            //do nothing
+        }
+
+        sleep(randint(0, T_INTRODUCER_MSG));
     }
 }
 
@@ -448,14 +448,10 @@ int main(int argc, char **argv) {
     member_list_update(g_member_list, &me);
 
     if (!is_introducer(&g_port)) {
-        struct port introducer_port = get_introducer();
-        char *buf;
-        size_t size = member_list_serialize(g_member_list, &msg_queue->arena, &buf);
-        //struct string payload = { .ptr=NULL, .len=0 };
-        struct string payload = { .ptr=buf, .len=size };
-        struct msg msg = { .type=MT_JOIN_REQ, .src=g_port, .dst=introducer_port, .payload=payload };
-        if (!node_send_msg(&msg, &msg_queue->arena)) {
-            printf("Failed to connect to introducer\n");
+        pthread_t introducer_msgr_thread;
+        int result = pthread_create(&introducer_msgr_thread, NULL, introducer_messager, NULL);
+        if (result != 0) {
+            printf("Failed to create listener thread\n");
             exit(1);
         }
     }
@@ -466,9 +462,6 @@ int main(int argc, char **argv) {
         printf("Failed to create listener thread\n");
         exit(1);
     }
-
-    //TODO: make gossiper thread here
-    //int udpsock = net_udp_listen(argv[1]);
 
     {
         pthread_t udp_listener_thread;
