@@ -1,5 +1,18 @@
+UDP gossip seems to work now
+    clean up code since it's really messy with
+
+Have gossip send membership list
+
+How does timestamp/heartbeat work again?
+    timestamp used to deterimine when peer has failed
+    
+    Once a node registers a peer as Tfail, don't do anything if you receive heatbeat from the failed node - ignore it.
+    Once Tcleanup passes, delete the node.
+
+
 Test UDP listener the same port as TCP listener
     have nodes send datagram packets to members (except self) to see if they arrive correctly
+    have the packets sent each second using a new gossiper thread
 
 Gossiper
     start a new thread that contains a single while loop with a sleep function called inside

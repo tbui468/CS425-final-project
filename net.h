@@ -139,6 +139,108 @@ void net_sigchld_handler(int s) {
     errno = saved_errno;
 }
 
+
+int net_sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *to, socklen_t tolen) {
+    ssize_t written = 0;
+    ssize_t n;
+
+    /*
+    while (written < len) {
+        if ((n = sendto(sockfd, buf + written, len - written, 0, to, tolen)) <= 0) {
+            if (n < 0 && errno == EINTR) {//interrupted but not error, so we need to try again
+                n = 0;
+            } else {
+                exit(1); //real error
+            }
+        }
+
+        written += n;
+    }
+    */
+
+    if ((n = sendto(sockfd, buf + written, len - written, 0, to, tolen)) <= 0) {
+        return false;
+    }
+    return true;
+}
+
+int net_recvfrom(int sockfd, void *buf, size_t len) {
+    struct sockaddr_storage their_addr;
+    socklen_t addr_len = sizeof(their_addr);
+    ssize_t nread = 0;
+    ssize_t n;
+    /*
+    while (nread < len) {
+        if ((n = recvfrom(sockfd, buf + nread, len - nread, 0, (struct sockaddr *) &their_addr, &addr_len)) < 0) {
+            if (n < 0 && errno == EINTR)
+                n = 0;
+            else
+                exit(1);
+        } else if (n == 0) {
+            //connection ended
+            return false;
+        }
+
+        nread += n;
+    }
+    */
+    if ((n = recvfrom(sockfd, buf + nread, len - nread, 0, (struct sockaddr *) &their_addr, &addr_len)) != -1) {
+        return true;
+    }
+
+    return false;
+}
+
+struct udp_listener {
+    int sockfd;
+    struct addrinfo *p;
+    struct addrinfo *root;
+};
+
+int net_udp_listen(const char* port, struct udp_listener *out) {
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE; //use local ip address
+
+    struct addrinfo* servinfo;
+    if (getaddrinfo(NULL, port, &hints, &servinfo) != 0) {
+        exit(1);
+    }
+
+    //loop through results for getaddrinfo and bind to first one we can
+    struct addrinfo* p;
+    int sockfd;
+    int yes = 1;
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+            continue;
+
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+            exit(1);
+
+        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+            close(sockfd);
+            continue;
+        }
+
+        break;
+    }
+
+    //freeaddrinfo(servinfo); //TODO: not freeining since this is needed for recvfrom
+
+    //failed to bind
+    if (p == NULL) {
+        exit(1);
+    }
+
+    struct udp_listener data = { .sockfd=sockfd, .p=p, .root=servinfo };
+    *out = data; 
+
+    return sockfd;
+}
+
 int net_listen(const char* port) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));

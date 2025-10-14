@@ -17,7 +17,8 @@ enum msg_type {
     MT_GREP_REQ,
     MT_GREP_RES,
     MT_JOIN_REQ,
-    MT_JOIN_RES
+    MT_JOIN_RES,
+    MT_HEARTBEAT_GOSSIP
 };
 
 struct msg {
@@ -98,6 +99,71 @@ bool msg_deserialize_resource(char *buf, struct msg *msg) {
     msg->payload.ptr = buf;
     buf += payload_size;
 
+    return true;
+}
+
+bool node_recvfrom_msg(int sockfd, struct arena *arena, struct msg *msg) {
+    uint32_t msg_len = 1024;
+    /*
+    if (!net_recvfrom(sockfd, (char *) &msg_len, sizeof(uint32_t))) {
+        printf("recvfrom returned\n");
+        return false;
+    }
+
+    printf("msg_len: %d\n", msg_len);
+    */
+
+    size_t payload_size = msg_len - sizeof(uint32_t);
+    char *buf = arena_malloc(arena, payload_size);
+
+    if (!net_recvfrom(sockfd, buf, payload_size)) {
+        return false;
+    }
+
+    assert(msg_deserialize_resource(buf, msg));
+
+    return true;
+}
+
+bool node_sendto_msg(struct msg *msg, struct arena *arena) {
+    int sockfd;
+    struct addrinfo hints, *servinfo, *p;
+    int rv;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+    char *cstring_port = arena_malloc(arena, msg->dst.len + 1);
+    memcpy(cstring_port, msg->dst.ptr, msg->dst.len);
+    cstring_port[msg->dst.len] = '\0';
+    rv = getaddrinfo("localhost", cstring_port, &hints, &servinfo);
+    if (rv != 0) {
+        printf("getaddrinfo failed\n");
+        return false;
+    }
+
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+            continue;
+        }
+        break;
+    }
+
+    if (p == NULL) {
+        printf("failed to bind to socket\n");
+        return false;
+    }
+
+    char *serialized_msg;
+    size_t msg_size = msg_serialize(msg, arena, &serialized_msg);
+    //serializing includes total message size for stream sockets, but we don't use it here, so removing uint32_t
+    serialized_msg += sizeof(uint32_t);
+    msg_size -= sizeof(uint32_t);
+
+    net_sendto(sockfd, serialized_msg, msg_size, 0, p->ai_addr, p->ai_addrlen);
+
+    freeaddrinfo(servinfo);
+    close(sockfd);
     return true;
 }
 

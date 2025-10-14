@@ -2,17 +2,14 @@
 #include "msg.h"
 #include <stdio.h>
 
-
-struct msg_queue *msg_queue;
-struct arena *g_arena;
-
+#define INTRODUCER_PORT "3000"
 
 static inline bool is_introducer(struct port *port) {
-    return memcmp(port->ptr, "3000", 4) == 0;
+    return memcmp(port->ptr, INTRODUCER_PORT, strlen(INTRODUCER_PORT)) == 0;
 }
 
 static inline struct port get_introducer() {
-    return (struct port) { .ptr="3000", .len=4 };
+    return (struct port) { .ptr=INTRODUCER_PORT, .len=strlen(INTRODUCER_PORT) };
 }
 
 struct member {
@@ -25,6 +22,11 @@ struct member_list {
     int count;
 };
 
+struct msg_queue *msg_queue; //TODO: rename to g_msg_queue
+struct arena *g_arena;
+uint64_t g_heartbeat;
+uint64_t g_timestamp;
+struct port g_port;
 struct member_list *g_member_list;
 
 void member_list_init(struct member_list *list) {
@@ -126,6 +128,48 @@ void *node_listen(void *arg) {
     }
 }
 
+void *node_udp_listen(void *arg) {
+    struct udp_listener ul;
+    int serverfd = net_udp_listen(arg, &ul);
+    struct arena arena;
+    arena_init(&arena, malloc, realloc, free);
+
+    while (true) {
+        struct msg msg;
+        //TODO: node_recv_msg won't work with stream socket???
+        //if (node_recv_msg(serverfd, &arena, &msg)) {
+        printf("attemp recvfrom\n");
+        if (node_recvfrom_msg(serverfd, &arena, &msg)) {
+            printf("recv gossip type: %d\n", msg.type);
+            //print_msg(&msg);
+            msg_queue_enqueue(msg_queue, &msg);
+        }
+        arena_dealloc_all(&arena);
+    }
+}
+
+void *node_gossip(void *arg) {
+    struct arena arena;
+    arena_init(&arena, malloc, realloc, free);
+    g_heartbeat = 1;
+    while (true) {
+        sleep(1);
+        //g_heartbeat++;
+        //g_timestamp++;
+        struct string payload = { .ptr=(char *)&g_heartbeat, .len=sizeof(g_heartbeat) };
+        //TODO: using the introducer as the dst, but it should be a random peer from membership list (but not self)
+        struct msg msg = { .type=MT_HEARTBEAT_GOSSIP, .src=g_port, .dst=get_introducer(), .payload=payload };
+        //TODO: use node_udp_msg(
+        //node_send_msg(&msg, &arena); //don't care if it fails - will try again next iteration
+        if (node_sendto_msg(&msg, &arena)) { //don't care if it fails - will try again next iteration
+            printf("sendto_msg success\n");
+        } else {
+            printf("sendto_msg failed\n");
+        }
+        arena_dealloc_all(&arena);
+    }
+}
+
 void handle_msg(struct msg *msg) {
     switch (msg->type) {
     case MT_GREP_REQ: {
@@ -180,7 +224,6 @@ void handle_msg(struct msg *msg) {
         }
         break;
     }
-
     case MT_JOIN_RES: {
         member_list_deserialize(msg->payload.ptr, g_member_list);
         member_list_print(g_member_list);
@@ -241,6 +284,8 @@ void member_list_serialization_test(struct arena *arena) {
 }
 
 int main(int argc, char **argv) {
+    g_heartbeat = 0;
+    g_timestamp = 0;
     g_arena = malloc(sizeof(struct arena));
     arena_init(g_arena, malloc, realloc, free);
 
@@ -252,15 +297,15 @@ int main(int argc, char **argv) {
 
     //member_list_serialization_test(&msg_queue->arena);
 
-    struct port my_port = { .len=strlen(argv[1]) };
-    memcpy(my_port.ptr, argv[1], my_port.len);
-    if (is_introducer(&my_port)) {
-        struct member me = { .port=my_port };
+    g_port = (struct port) { .len=strlen(argv[1]) };
+    memcpy(g_port.ptr, argv[1], g_port.len);
+    if (is_introducer(&g_port)) {
+        struct member me = { .port=g_port };
         member_list_append(g_member_list, &me);
     } else {
         struct port introducer_port = get_introducer();
         struct string payload = { .ptr=NULL, .len=0 };
-        struct msg msg = { .type=MT_JOIN_REQ, .src=my_port, .dst=introducer_port, .payload=payload };
+        struct msg msg = { .type=MT_JOIN_REQ, .src=g_port, .dst=introducer_port, .payload=payload };
         if (!node_send_msg(&msg, &msg_queue->arena)) {
             printf("Failed to connect to introducer\n");
             exit(1);
@@ -275,6 +320,26 @@ int main(int argc, char **argv) {
     }
 
     //TODO: make gossiper thread here
+    //int udpsock = net_udp_listen(argv[1]);
+
+    {
+        pthread_t udp_listener_thread;
+        int result = pthread_create(&udp_listener_thread, NULL, node_udp_listen, argv[1]);
+        if (result != 0) {
+            printf("Failed to create udp listener thread\n");
+            exit(1);
+        }
+    }
+
+    {
+        pthread_t gossiper_thread;
+        int result = pthread_create(&gossiper_thread, NULL, node_gossip, NULL);
+        if (result != 0) {
+            printf("Failed to create gossiper thread\n");
+            exit(1);
+        }
+    }
+    
 
     while (true) {
         struct msg *msg;
