@@ -1,23 +1,27 @@
-UDP gossip seems to work now
-    clean up code since it's really messy with
+Nodes should periodically attempt to connect to the introducer peer in case it fails
+    nodes need to introduce themselves back to introducer to ensure partitions don't develop
+    the tcp code that runs in main function of node.c can be repurposed for this
 
-Have gossip send membership list
+    Make an introducer thread that periodically sends TCP messages to introducer
+        this should run once on startup to get node's initial peers
+        make this sum set minimum time T_INTRODUCE + random integer amount to ensure
+        introducer is not overloaded
 
-How does timestamp/heartbeat work again?
-    timestamp used to deterimine when peer has failed
-    
-    Once a node registers a peer as Tfail, don't do anything if you receive heatbeat from the failed node - ignore it.
-    Once Tcleanup passes, delete the node.
+        make this thread sleep T_INTRODUCER + random amount, and wake up periodically to check introducer
 
+write script to start introducer and 7 other nodes to test more quickly
+    need a way to ending processes on certain ports to test failure
+    make a script that works like this: ./stop_node 3002
 
-Test UDP listener the same port as TCP listener
-    have nodes send datagram packets to members (except self) to see if they arrive correctly
-    have the packets sent each second using a new gossiper thread
-
-Gossiper
-    start a new thread that contains a single while loop with a sleep function called inside
-    this function wakes up every 1 second or so
-    updates its own heartbeat counter, and then UDPs this list to a random neighbor (or round robin)
+write membership tests
+    peer joins successfully
+    peer fails joins (introducer down)
+    one peer fails
+    less than half peers fail
+    more than half peers fail
+    all non-introducer peers fail
+    introducer fails
+    introducer rejoins
 
 Membership protocol
     introducer and new nodes use tcp to make initial connection

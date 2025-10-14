@@ -139,52 +139,49 @@ void net_sigchld_handler(int s) {
     errno = saved_errno;
 }
 
+int net_send_datagram(const char *host, const char *port, const void *buf, size_t len) {
+    int sockfd;
+    struct addrinfo hints, *servinfo, *p;
+    int rv;
 
-int net_sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *to, socklen_t tolen) {
-    ssize_t written = 0;
-    ssize_t n;
-
-    /*
-    while (written < len) {
-        if ((n = sendto(sockfd, buf + written, len - written, 0, to, tolen)) <= 0) {
-            if (n < 0 && errno == EINTR) {//interrupted but not error, so we need to try again
-                n = 0;
-            } else {
-                exit(1); //real error
-            }
-        }
-
-        written += n;
-    }
-    */
-
-    if ((n = sendto(sockfd, buf + written, len - written, 0, to, tolen)) <= 0) {
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+    rv = getaddrinfo(host, port, &hints, &servinfo);
+    if (rv != 0) {
         return false;
     }
+
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+            continue;
+        }
+        break;
+    }
+
+    if (p == NULL) {
+        return false;
+    }
+    ssize_t n;
+
+    if ((n = sendto(sockfd, buf, len, 0, p->ai_addr, p->ai_addrlen)) <= 0) {
+        freeaddrinfo(servinfo);
+        close(sockfd);
+        return false;
+    }
+
+
+    freeaddrinfo(servinfo);
+    close(sockfd);
     return true;
 }
 
 int net_recvfrom(int sockfd, void *buf, size_t len) {
     struct sockaddr_storage their_addr;
     socklen_t addr_len = sizeof(their_addr);
-    ssize_t nread = 0;
     ssize_t n;
-    /*
-    while (nread < len) {
-        if ((n = recvfrom(sockfd, buf + nread, len - nread, 0, (struct sockaddr *) &their_addr, &addr_len)) < 0) {
-            if (n < 0 && errno == EINTR)
-                n = 0;
-            else
-                exit(1);
-        } else if (n == 0) {
-            //connection ended
-            return false;
-        }
 
-        nread += n;
-    }
-    */
-    if ((n = recvfrom(sockfd, buf + nread, len - nread, 0, (struct sockaddr *) &their_addr, &addr_len)) != -1) {
+    if ((n = recvfrom(sockfd, buf, len, 0, (struct sockaddr *) &their_addr, &addr_len)) != -1) {
         return true;
     }
 
