@@ -2,22 +2,22 @@
 #include "msg.h"
 #include <stdio.h>
 
-#define INTRODUCER_PORT "3000"
+#define INTRODUCER_PORT 3000
 #define T_FAIL 32
 #define T_CLEANUP T_FAIL * 2
 #define T_GOSSIP 100000
 #define T_INTRODUCER_MSG 30
 
-static inline bool is_introducer(struct port *port) {
-    return memcmp(port->ptr, INTRODUCER_PORT, strlen(INTRODUCER_PORT)) == 0;
+static inline bool is_introducer(port_t port) {
+    return port == INTRODUCER_PORT;
 }
 
-static inline struct port get_introducer() {
-    return (struct port) { .ptr=INTRODUCER_PORT, .len=strlen(INTRODUCER_PORT) };
+static inline port_t get_introducer() {
+    return INTRODUCER_PORT;
 }
 
 struct member {
-    struct port port;
+    port_t port;
     uint64_t heartbeat;
     uint64_t timestamp;
 };
@@ -32,7 +32,7 @@ struct msg_queue *msg_queue; //TODO: rename to g_msg_queue
 struct arena *g_arena;
 uint64_t g_heartbeat;
 uint64_t g_timestamp;
-struct port g_port;
+port_t g_port;
 struct member_list *g_member_list;
 
 void member_list_init(struct member_list *list, struct arena *arena) {
@@ -45,10 +45,10 @@ int randint(int min, int max) {
     return (rand() % (max - min + 1)) + min;
 }
 
-int member_list_idx(struct member_list *list, struct port *port) {
+int member_list_idx(struct member_list *list, port_t port) {
     for (int i = 0; i < list->count; i++) {
-        struct member cur = list->values[i];
-        if (ports_equal(&cur.port, port)) {
+        struct member *cur = &list->values[i];
+        if (cur->port == port) {
             return i;
         }
     }
@@ -58,7 +58,7 @@ int member_list_idx(struct member_list *list, struct port *port) {
 
 void update_own_heartbeat() {
     int idx;
-    assert((idx = member_list_idx(g_member_list, &g_port)) >= 0);
+    assert((idx = member_list_idx(g_member_list, g_port)) >= 0);
     g_member_list->values[idx].heartbeat = g_heartbeat;
     g_member_list->values[idx].timestamp = g_timestamp;
 }
@@ -73,7 +73,7 @@ static bool member_cleanup(struct member *member) {
 }
 
 void member_print(struct member *member) {
-    printf("port: %.*s, heartbeat: %ld, timestamp: %ld\n", (int) member->port.len, member->port.ptr, member->heartbeat, member->timestamp);
+    printf("port: %d, heartbeat: %ld, timestamp: %ld\n", member->port, member->heartbeat, member->timestamp);
 }
 
 
@@ -89,7 +89,7 @@ void member_list_cleanup(struct member_list *list) {
     while (idx < list->count) {
         struct member *cur = &list->values[idx];
         if (member_cleanup(cur)) {
-            printf("[%.*s]: peer left: ", (int) g_port.len, g_port.ptr);
+            printf("[%d]: peer left: ", g_port);
             member_print(cur);
 
             memcpy(cur, &list->values[list->count - 1], sizeof(struct member));
@@ -115,7 +115,7 @@ void member_list_append(struct member_list *list, struct member *member) {
 
 void member_list_update(struct member_list *list, struct member *member) {
     int idx;
-    if ((idx = member_list_idx(list, &member->port)) >= 0) {
+    if ((idx = member_list_idx(list, member->port)) >= 0) {
         struct member *cur = &list->values[idx];
         if (member->heartbeat > cur->heartbeat && !member_failed(cur)) {
             cur->heartbeat = member->heartbeat;
@@ -124,7 +124,7 @@ void member_list_update(struct member_list *list, struct member *member) {
     } else {
         member_list_append(list, member);
 
-        printf("[%.*s]: peer join: ", (int) g_port.len, g_port.ptr);
+        printf("[%d]: peer join: ", g_port);
         member_print(&list->values[list->count - 1]);
     }
 }
@@ -137,9 +137,9 @@ bool member_list_random_entry(struct member_list *list, struct member *result) {
 
     while (true) {
         int r = randint(0, list->count - 1);
-        struct member cur = list->values[r];
-        if (!ports_equal(&cur.port, &g_port)) {
-            *result = cur;
+        struct member *cur = &list->values[r];
+        if (cur->port != g_port) {
+            *result = *cur;
             return true;
         }
     }
@@ -226,7 +226,7 @@ void member_list_deserialize(char *buf, struct member_list *list) {
 
 void *introducer_messager(void *arg) {
     while (true) {
-        struct port introducer_port = get_introducer();
+        port_t introducer_port = get_introducer();
         char *buf;
         size_t size = member_list_serialize(g_member_list, &msg_queue->arena, &buf);
         struct string payload = { .ptr=buf, .len=size };
@@ -386,7 +386,7 @@ void member_serialization_test(struct arena *arena) {
     size_t l = member_serialize(&m, arena, &b);
     struct member n;
     assert(member_deserialize(b, &n));
-    printf("expect 3000: %.*s\n", (int) n.port.len, n.port.ptr);
+    printf("expect 3000: %d\n", n.port);
 }
 
 
@@ -394,15 +394,15 @@ void member_list_serialization_test(struct arena *arena) {
     struct member_list my_list;
     member_list_init(&my_list, arena);
     //make a bunch of fake members
-    struct member m0 = { .port=(struct port) { .ptr="3000", .len=4 } };
-    struct member m1 = { .port=(struct port) { .ptr="3001", .len=4 } };
-    struct member m2 = { .port=(struct port) { .ptr="3002", .len=4 } };
-    struct member m3 = { .port=(struct port) { .ptr="3003", .len=4 } };
-    struct member m4 = { .port=(struct port) { .ptr="3004", .len=4 } };
-    struct member m5 = { .port=(struct port) { .ptr="3005", .len=4 } };
-    struct member m6 = { .port=(struct port) { .ptr="3006", .len=4 } };
-    struct member m7 = { .port=(struct port) { .ptr="3007", .len=4 } };
-    struct member m8 = { .port=(struct port) { .ptr="3008", .len=4 } };
+    struct member m0 = { .port=3000 };
+    struct member m1 = { .port=3001 };
+    struct member m2 = { .port=3002 };
+    struct member m3 = { .port=3003 };
+    struct member m4 = { .port=3004 };
+    struct member m5 = { .port=3005 };
+    struct member m6 = { .port=3006 };
+    struct member m7 = { .port=3007 };
+    struct member m8 = { .port=3008 };
     member_list_update(&my_list, &m0);
     member_list_update(&my_list, &m1);
     member_list_update(&my_list, &m2);
@@ -441,13 +441,12 @@ int main(int argc, char **argv) {
     member_list_init(g_member_list, g_arena);
 
     //member_list_serialization_test(&msg_queue->arena);
-
-    g_port = (struct port) { .len=strlen(argv[1]) };
-    memcpy(g_port.ptr, argv[1], g_port.len);
+    char *endptr;
+    g_port = strtoul(argv[1], &endptr, 10);
     struct member me = { .port=g_port, .heartbeat=g_heartbeat, .timestamp=g_timestamp };
     member_list_update(g_member_list, &me);
 
-    if (!is_introducer(&g_port)) {
+    if (!is_introducer(g_port)) {
         pthread_t introducer_msgr_thread;
         int result = pthread_create(&introducer_msgr_thread, NULL, introducer_messager, NULL);
         if (result != 0) {

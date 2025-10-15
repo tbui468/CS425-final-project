@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #define SERVER_COUNT 8
-#define LISTENING_PORT "4000"
+#define LISTENING_PORT 4000
 
 bool complete[SERVER_COUNT] = { 
                                 false, false, false, false,
@@ -11,16 +11,16 @@ bool complete[SERVER_COUNT] = {
                                 };
 
 
-const char *ports[SERVER_COUNT] = { 
-                                    "3000", "3001", "3002", "3003",
-                                    "3004", "3005", "3006", "3007"
+const port_t ports[SERVER_COUNT] = { 
+                                    3000, 3001, 3002, 3003,
+                                    3004, 3005, 3006, 3007
                                     };
 
 struct msg_queue *msg_queue;
 
-void set_complete_status(struct port *port) {
+void set_complete_status(port_t port) {
     for (int i = 0; i < SERVER_COUNT; i++) {
-        if (memcmp(ports[i], port->ptr, port->len) == 0) {
+        if (ports[i] == port) {
             complete[i] = true;
             break;
         }
@@ -38,8 +38,8 @@ void set_complete_status(struct port *port) {
 void handle_msg(struct msg *msg) {
     switch (msg->type) {
     case MT_GREP_RES: {
-        printf("[%.*s]:\n%.*s", (int) msg->src.len, msg->src.ptr, (int) msg->payload.len, msg->payload.ptr);
-        set_complete_status(&msg->src);
+        printf("[%d]:\n%.*s", msg->src, (int) msg->payload.len, msg->payload.ptr);
+        set_complete_status(msg->src);
 
         break;  
     }
@@ -100,7 +100,9 @@ int main(int argc, char **argv) {
     msg_queue_init(msg_queue);
 
     pthread_t listener_thread;
-    int result = pthread_create(&listener_thread, NULL, node_listen, LISTENING_PORT);
+    char port_buf[8];
+    sprintf(port_buf, "%d", LISTENING_PORT);
+    int result = pthread_create(&listener_thread, NULL, node_listen, port_buf);
     if (result != 0) {
         exit(1);
     }
@@ -112,13 +114,12 @@ int main(int argc, char **argv) {
     for (int i = 0; i < SERVER_COUNT; i++) {
         struct msg msg;
         msg.type = MT_GREP_REQ;
-        msg.src = (struct port) { .ptr=LISTENING_PORT, .len=strlen(LISTENING_PORT) };
-        msg.dst = (struct port) { .len=strlen(ports[i]) };
-        memcpy(msg.dst.ptr, ports[i], msg.dst.len);
+        msg.src = LISTENING_PORT;
+        msg.dst = ports[i];
         msg.payload = (struct string) { .ptr = grep_buf, .len = grep_len };
         if (!node_send_msg(&msg, &msg_queue->arena)) {
             printf("failed to connect\n");
-            set_complete_status(&msg.dst);
+            set_complete_status(msg.dst);
         } else {
             printf("connected\n");
         }
