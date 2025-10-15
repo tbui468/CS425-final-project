@@ -1,15 +1,6 @@
-move member + member_list to new file:
-    net.h //low-level sockets
-    msg.h //higher-level messages + message queue
-    member.h //member + membership list
-    node.c //main program
-
 write script to start introducer and 7 other nodes to test more quickly
     need a way to ending processes on certain ports to test failure
     make a script that works like this: ./stop_node 3002
-
-need to be careful with serializing and deserializing struct member
-    should be allocating string string payload
 
 write membership tests
     peer joins successfully

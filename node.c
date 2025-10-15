@@ -1,5 +1,8 @@
 #include "net.h"
 #include "msg.h"
+#include "member.h"
+#include "util.h"
+#include "arena.h"
 #include <stdio.h>
 
 #define INTRODUCER_PORT 3000
@@ -7,6 +10,13 @@
 #define T_CLEANUP T_FAIL * 2
 #define T_GOSSIP 100000
 #define T_INTRODUCER_MSG 30
+
+struct msg_queue *msg_queue; //TODO: rename to g_msg_queue
+struct arena *g_arena;
+uint64_t g_heartbeat;
+uint64_t g_timestamp;
+port_t g_port;
+struct member_list *g_member_list;
 
 static inline bool is_introducer(port_t port) {
     return port == INTRODUCER_PORT;
@@ -16,45 +26,6 @@ static inline port_t get_introducer() {
     return INTRODUCER_PORT;
 }
 
-struct member {
-    port_t port;
-    uint64_t heartbeat;
-    uint64_t timestamp;
-};
-
-struct member_list {
-    struct member *values;
-    int capacity;
-    int count;
-};
-
-struct msg_queue *msg_queue; //TODO: rename to g_msg_queue
-struct arena *g_arena;
-uint64_t g_heartbeat;
-uint64_t g_timestamp;
-port_t g_port;
-struct member_list *g_member_list;
-
-void member_list_init(struct member_list *list, struct arena *arena) {
-    list->capacity = 8;
-    list->count = 0;
-    list->values = arena_malloc(arena, sizeof(struct member) * list->capacity);
-}
-
-int randint(int min, int max) {
-    return (rand() % (max - min + 1)) + min;
-}
-
-int member_list_idx(struct member_list *list, port_t port) {
-    for (int i = 0; i < list->count; i++) {
-        struct member *cur = &list->values[i];
-        if (cur->port == port) {
-            return i;
-        }
-    }
-    
-    return -1;
-}
 
 void update_own_heartbeat() {
     int idx;
@@ -63,26 +34,14 @@ void update_own_heartbeat() {
     g_member_list->values[idx].timestamp = g_timestamp;
 }
 
-static bool member_failed(struct member *member) {
+static inline bool member_failed(struct member *member) {
     return g_timestamp - member->timestamp >= T_FAIL;
 }
 
 
-static bool member_cleanup(struct member *member) {
+static inline bool member_cleanup(struct member *member) {
     return g_timestamp - member->timestamp >= T_CLEANUP;
 }
-
-void member_print(struct member *member) {
-    printf("port: %d, heartbeat: %ld, timestamp: %ld\n", member->port, member->heartbeat, member->timestamp);
-}
-
-
-void member_list_print(struct member_list *list) {
-    for (int i = 0; i < list->count; i++) {
-        member_print(&list->values[i]);
-    }
-}
-
 
 void member_list_cleanup(struct member_list *list) {
     int idx = 0;
@@ -101,18 +60,6 @@ void member_list_cleanup(struct member_list *list) {
 }
 
 
-void member_list_append(struct member_list *list, struct member *member) {
-    if (list->count == list->capacity) {
-        list->capacity *= 2;
-        list->values = arena_realloc(g_arena, list->values, sizeof(struct member) * list->capacity);
-    }
-
-
-    list->values[list->count] = *member;
-    list->values[list->count].timestamp = g_timestamp;
-    list->count++;
-}
-
 void member_list_update(struct member_list *list, struct member *member) {
     int idx;
     if ((idx = member_list_idx(list, member->port)) >= 0) {
@@ -122,6 +69,7 @@ void member_list_update(struct member_list *list, struct member *member) {
             cur->timestamp = g_timestamp;
         }
     } else {
+        member->timestamp = g_timestamp;
         member_list_append(list, member);
 
         printf("[%d]: peer join: ", g_port);
@@ -155,27 +103,6 @@ void member_list_merge(struct member_list *list, struct member_list *other) {
     }
 }
 
-size_t member_serialize(const struct member *member, struct arena *arena, char **out_buf) {
-    size_t size = sizeof(struct member);
-    char *buf = arena_malloc(arena, size);
-    memcpy(buf, member, sizeof(struct member));
-    
-    *out_buf = buf;
-    return size;
-}
-
-size_t member_deserialize(char *buf, struct member *member) {
-    memcpy(member, buf, sizeof(struct member));
-    return sizeof(struct member);
-}
-
-size_t member_serialized_size(struct arena *arena) {
-    struct member m = { .port=get_introducer() };
-    char *b;
-    size_t s = member_serialize(&m, arena, &b);
-    return s;
-}
-
 int member_list_failed_members(const struct member_list *list) {
     int count = 0;
     for (int i = 0; i < list->count; i++) {
@@ -188,47 +115,24 @@ int member_list_failed_members(const struct member_list *list) {
     return count;
 }
 
-//uint32_t count
-size_t member_list_serialize(const struct member_list *list, struct arena *arena, char **out_buf) {
-    size_t member_size = member_serialized_size(arena);
-    uint32_t failed_count = member_list_failed_members(list);
-    size_t list_size = sizeof(uint32_t) + (list->count - failed_count) * member_size;
-    char *buf = arena_malloc(arena, list_size);
-    uint32_t fixed_count = list->count - failed_count;
-    memcpy(buf, &fixed_count, sizeof(uint32_t));
-    char *b;
-    int off = 0;
+size_t serialize_nonfailed_members(const struct member_list *list, struct arena *arena, char **out_buf) {
+    struct member_list nonfailed;
+    member_list_init(&nonfailed, arena);
     for (int i = 0; i < list->count; i++) {
         struct member *m = &list->values[i]; 
         if (!member_failed(m)) {
-            assert(member_serialize(m, arena, &b) == member_size);
-            memcpy(buf + sizeof(uint32_t) + off * member_size, b, member_size);
-            off++;
+            member_list_append(&nonfailed, m);
         }
     }
 
-    *out_buf = buf;
-    return list_size;
-}
-
-
-void member_list_deserialize(char *buf, struct member_list *list) {
-    list->count = 0;
-    uint32_t count = *((uint32_t*) buf);
-    buf += sizeof(uint32_t);
-
-    for (int i = 0; i < count; i++) {
-        struct member member;
-        buf += member_deserialize(buf, &member);
-        member_list_append(list, &member);
-    }
+    return member_list_serialize(&nonfailed, arena, out_buf);
 }
 
 void *introducer_messager(void *arg) {
     while (true) {
         port_t introducer_port = get_introducer();
         char *buf;
-        size_t size = member_list_serialize(g_member_list, &msg_queue->arena, &buf);
+        size_t size = serialize_nonfailed_members(g_member_list, &msg_queue->arena, &buf);
         struct string payload = { .ptr=buf, .len=size };
         struct msg msg = { .type=MT_JOIN_REQ, .src=g_port, .dst=introducer_port, .payload=payload };
         if (!node_send_msg(&msg, &msg_queue->arena)) {
@@ -283,7 +187,7 @@ void *node_gossip(void *arg) {
         update_own_heartbeat();
 
         char *buf;
-        size_t size = member_list_serialize(g_member_list, &msg_queue->arena, &buf);
+        size_t size = serialize_nonfailed_members(g_member_list, &msg_queue->arena, &buf);
         struct member m;
         if (member_list_random_entry(g_member_list, &m)) {
             struct msg msg = { .type=MT_HEARTBEAT, .src=g_port, .dst=m.port, .payload=(struct string) { .ptr=buf, .len=size } };
@@ -345,10 +249,8 @@ void handle_msg(struct msg *msg) {
         member_list_merge(g_member_list, &peer_list);
 
 
-        //struct member member = { .port=msg->src };
-        //member_list_update(g_member_list, &member);
         char *buf;
-        size_t size = member_list_serialize(g_member_list, &msg_queue->arena, &buf);
+        size_t size = serialize_nonfailed_members(g_member_list, &msg_queue->arena, &buf);
         struct msg res_msg = { .type=MT_JOIN_RES, .src=msg->dst, .dst=msg->src, .payload=(struct string) { .ptr=buf, .len=size } };
         if (!node_send_msg(&res_msg, &msg_queue->arena)) {
             printf("failed to connect\n");
@@ -362,8 +264,6 @@ void handle_msg(struct msg *msg) {
         member_list_init(&peer_list, &msg_queue->arena);
         member_list_deserialize(msg->payload.ptr,&peer_list);
         member_list_merge(g_member_list, &peer_list);
-        //member_list_deserialize(msg->payload.ptr, g_member_list);
-        //member_list_print(g_member_list);
         break;
     }
     case MT_HEARTBEAT: {
@@ -371,7 +271,6 @@ void handle_msg(struct msg *msg) {
         member_list_init(&peer_list, &msg_queue->arena);
         member_list_deserialize(msg->payload.ptr,&peer_list);
         member_list_merge(g_member_list, &peer_list);
-        //member_list_print(g_member_list);
         break; 
     }
     default:
@@ -440,7 +339,6 @@ int main(int argc, char **argv) {
     g_member_list = arena_malloc(g_arena, sizeof(struct member_list));
     member_list_init(g_member_list, g_arena);
 
-    //member_list_serialization_test(&msg_queue->arena);
     char *endptr;
     g_port = strtoul(argv[1], &endptr, 10);
     struct member me = { .port=g_port, .heartbeat=g_heartbeat, .timestamp=g_timestamp };
