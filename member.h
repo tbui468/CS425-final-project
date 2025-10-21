@@ -14,6 +14,9 @@ struct member_list {
     struct arena *arena;
 };
 
+void member_to_cstring(struct member *member, char *buf, size_t maxsize) {
+    snprintf(buf, maxsize, "<port: %d> <heartbeat: %ld> <timestamp: %ld>\n", member->port, member->heartbeat, member->timestamp);
+}
 void member_print(struct member *member) {
     printf("port: %d, heartbeat: %ld, timestamp: %ld\n", member->port, member->heartbeat, member->timestamp);
 }

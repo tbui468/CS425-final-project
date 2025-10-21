@@ -1,9 +1,24 @@
-write script to start introducer and 7 other nodes to test more quickly
-    need a way to ending processes on certain ports to test failure
-    make a script that works like this: ./stop_node 3002
+peer joins successfully tests
+    start node 3000
+    start node 3001
+    ...
+    start node 3007
+
+    All 8 nodes should log peers that join/leave
+    Ensure that all 8 logs contain 8 joins and 0 fails
+
+Tests need to be quick, so maybe consider setting T_FAIL/T_CLEANUP to make testing fast - can do this after 
+
+peer can't connect to introducer
+    start node 3001
+    ...
+    start node 3007
+
+    Ensure that all 7 logs contain 1 join each and 0 fails
 
 write membership tests
     peer joins successfully
+        should be checking logs
     peer fails joins (introducer down)
     one peer fails
     less than half peers fail

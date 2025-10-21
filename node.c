@@ -4,12 +4,20 @@
 #include "util.h"
 #include "arena.h"
 #include <stdio.h>
+#include <stdarg.h>
 
 #define INTRODUCER_PORT 3000
 #define T_FAIL 32
 #define T_CLEANUP T_FAIL * 2
 #define T_GOSSIP 100000
 #define T_INTRODUCER_MSG 30
+#define MAX_STRING 1024
+
+enum event {
+    E_PEER_JOIN = 0,
+    E_PEER_FAIL
+};
+
 
 struct msg_queue *msg_queue; //TODO: rename to g_msg_queue
 struct arena *g_arena;
@@ -17,6 +25,27 @@ uint64_t g_heartbeat;
 uint64_t g_timestamp;
 port_t g_port;
 struct member_list *g_member_list;
+
+void log_event(enum event event, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    fprintf(stdout, "[%d]: ", g_port);
+    switch (event) {
+    case E_PEER_JOIN:
+        fprintf(stdout, "PEER JOIN ");
+        break;
+    case E_PEER_FAIL:
+        fprintf(stdout, "PEER FAIL ");
+        break;
+    default:
+        assert(false);
+        break;
+    }
+    vfprintf(stdout, fmt, args);
+
+    va_end(args);
+}
 
 static inline bool is_introducer(port_t port) {
     return port == INTRODUCER_PORT;
@@ -48,8 +77,10 @@ void member_list_cleanup(struct member_list *list) {
     while (idx < list->count) {
         struct member *cur = &list->values[idx];
         if (member_cleanup(cur)) {
-            printf("[%d]: peer left: ", g_port);
-            member_print(cur);
+            char buf[MAX_STRING];
+            member_to_cstring(cur, buf, MAX_STRING);
+            log_event(E_PEER_FAIL, "%s", buf);
+            //member_print(cur);
 
             memcpy(cur, &list->values[list->count - 1], sizeof(struct member));
             list->count--;
@@ -72,8 +103,10 @@ void member_list_update(struct member_list *list, struct member *member) {
         member->timestamp = g_timestamp;
         member_list_append(list, member);
 
-        printf("[%d]: peer join: ", g_port);
-        member_print(&list->values[list->count - 1]);
+        char buf[MAX_STRING];
+        member_to_cstring(&list->values[list->count - 1], buf, MAX_STRING);
+        log_event(E_PEER_JOIN, "%s", buf);
+        //member_print(&list->values[list->count - 1]);
     }
 }
 
