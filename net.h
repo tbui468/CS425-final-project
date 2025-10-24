@@ -20,7 +20,7 @@
     https://beej.us/guide/bgnet/
 */
 
-#define BACKLOG 10
+#define BACKLOG 16
 
 /*
     client

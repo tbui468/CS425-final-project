@@ -3,6 +3,8 @@
 
 #include "arena.h"
 
+#define MAX_STRING 1024
+
 struct string {
     char *ptr;
     size_t len;
