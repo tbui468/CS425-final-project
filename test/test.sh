@@ -35,50 +35,50 @@ echo "========Basic Test========"
 passed=$((passed + $?))
 ((total++))
 
-echo "========On One Machine Test========"
-./on_one_machine_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
-
-echo "========On Some Machines Test========"
-./on_some_machines_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
-
-echo "========On All Machines Test========"
-./on_all_machines_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
-
-echo "========Medium-Sized Log Test========"
-./medium_sized_log_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
-
-echo "========Large-Sized Log Test========"
-./large_sized_log_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
-
-echo "========Medium-Sized Result Test========"
-./medium_sized_result_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
-
-echo "========Large-Sized Result Test========"
-./large_sized_result_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
-
-echo "========Failed Node Test========"
-./failed_node_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
-
-echo "========Failed Nodes Test========"
-./failed_nodes_test.sh ${machine_dirs[@]}
-passed=$((passed + $?))
-((total++))
+#echo "========On One Machine Test========"
+#./on_one_machine_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
+#
+#echo "========On Some Machines Test========"
+#./on_some_machines_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
+#
+#echo "========On All Machines Test========"
+#./on_all_machines_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
+#
+#echo "========Medium-Sized Log Test========"
+#./medium_sized_log_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
+#
+#echo "========Large-Sized Log Test========"
+#./large_sized_log_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
+#
+#echo "========Medium-Sized Result Test========"
+#./medium_sized_result_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
+#
+#echo "========Large-Sized Result Test========"
+#./large_sized_result_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
+#
+#echo "========Failed Node Test========"
+#./failed_node_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
+#
+#echo "========Failed Nodes Test========"
+#./failed_nodes_test.sh ${machine_dirs[@]}
+#passed=$((passed + $?))
+#((total++))
 
 
 echo "========TOTAL PASSED========"

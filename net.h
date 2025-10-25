@@ -247,7 +247,7 @@ int net_listen(const char* port) {
 
     struct addrinfo* servinfo;
     if (getaddrinfo(NULL, port, &hints, &servinfo) != 0) {
-        return 1;
+        exit(1);
     }
 
     //loop through results for getaddrinfo and bind to first one we can
@@ -258,8 +258,9 @@ int net_listen(const char* port) {
         if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
             continue;
 
-        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
             exit(1);
+        }
 
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             close(sockfd);

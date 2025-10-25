@@ -1,20 +1,6 @@
-Refactor to move all memberlist modification code to member.h
-    this will make the locking easier to handle
+Tests failing now for some reason
+    It's mostly due to fact that 
 
-Fix race condition first
-    need to be careful here since some memberlist functions are called within itself, recursivly locking if we have multiple locks
-
-I think this actually may be a race condition (90% positive this is the issue)
-    gossip is running on a thread, and may cleanup nodes
-    BUT handle message is running on a different thread that may also update memberlist
-    will need a lock to prevent this by adding a mutex to member_list
-    will need to make a memberlist_destroy function to free mutex too
-
-    Big problem is we have memberlist split across node.c and member.c, BUT
-    we need to lock the global member_list when ever used.
-
-    Move ALL member related functions to member.h, and have functions take
-        in heartbeats and timestamps as arguments rather than relying on global state in node.c
 
 Renaming member_list to memberlist might be a good idea to simplify reading
 

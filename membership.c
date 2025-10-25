@@ -1,41 +1,34 @@
-#ifndef MEMBER_H
-#define MEMBER_H
+#include "membership.h"
 
-#include "log.h"
-#include "util.h"
-
-#define T_FAIL 16 * 1
-#define T_CLEANUP T_FAIL * 2
-
-struct member {
-    port_t port;
-    uint64_t heartbeat;
-    uint64_t timestamp;
-};
-
-struct member_list {
-    struct member *values;
-    int capacity;
-    int count;
-    struct arena *arena;
-    pthread_mutex_t *mtx;
-};
+#include "arena.h"
+#include "common.h"
 
 bool member_failed(struct member *member, int global_time) {
     return global_time - member->timestamp >= T_FAIL;
 }
 
-
 bool member_cleanup(struct member *member, int global_time) {
     return global_time - member->timestamp >= T_CLEANUP;
 }
 
+/*
+#define memberlist_lock(list) \
+    if (list->mtx) { \
+        log_event(E_DEBUG, "locking %s", __func__); \
+        pthread_mutex_lock(list->mtx); \
+        log_event(E_DEBUG, "locked %s", __func__); \
+    }
+*/
 void memberlist_lock(struct member_list *list) {
-    if (list->mtx) pthread_mutex_lock(list->mtx);
+    if (list->mtx) { 
+        pthread_mutex_lock(list->mtx);
+    }
 }
 
 void memberlist_unlock(struct member_list *list) {
-    if (list->mtx) pthread_mutex_unlock(list->mtx);
+    if (list->mtx) {
+        pthread_mutex_unlock(list->mtx);
+    }
 }
 
 void member_to_cstring(struct member *member, char *buf, size_t maxsize) {
@@ -60,7 +53,7 @@ void member_list_init(struct member_list *list, struct arena *arena, pthread_mut
     list->mtx = mtx;
 }
 
-int member_list_idx(struct member_list *list, port_t port) {
+static int member_list_idx(struct member_list *list, port_t port) {
     for (int i = 0; i < list->count; i++) {
         struct member *cur = &list->values[i];
         if (cur->port == port) {
@@ -72,14 +65,15 @@ int member_list_idx(struct member_list *list, port_t port) {
 }
 
 void update_own_heartbeat(struct member_list *list, port_t port, int global_timestamp, int global_heartbeat) {
+    memberlist_lock(list);
     int idx;
     assert((idx = member_list_idx(list, port)) >= 0);
     list->values[idx].heartbeat = global_heartbeat;
     list->values[idx].timestamp = global_timestamp;
+    memberlist_unlock(list);
 }
 
 void member_list_append(struct member_list *list, struct member *member) {
-    memberlist_lock(list);
 
     if (list->count == list->capacity) {
         list->capacity *= 2;
@@ -90,7 +84,6 @@ void member_list_append(struct member_list *list, struct member *member) {
     list->values[list->count] = *member;
     list->count++;
 
-    memberlist_unlock(list);
 }
 
 
@@ -101,11 +94,6 @@ size_t member_serialize(const struct member *member, struct arena *arena, char *
     
     *out_buf = buf;
     return size;
-}
-
-size_t member_deserialize(char *buf, struct member *member) {
-    memcpy(member, buf, sizeof(struct member));
-    return sizeof(struct member);
 }
 
 size_t member_list_serialize(const struct member_list *list, struct arena *arena, char **out_buf) {
@@ -126,19 +114,23 @@ size_t member_list_serialize(const struct member_list *list, struct arena *arena
 }
 
 void member_list_deserialize(char *buf, struct member_list *list) {
+    memberlist_lock(list);
     list->count = 0;
     uint32_t count = *((uint32_t*) buf);
     buf += sizeof(uint32_t);
 
     for (int i = 0; i < count; i++) {
-        struct member member;
-        buf += member_deserialize(buf, &member);
+        struct member member = *((struct member *) buf);
+        
+        buf += sizeof(struct member);
         member_list_append(list, &member);
     }
+    memberlist_unlock(list);
 }
 
 
 void member_list_cleanup(struct member_list *list, int global_timestamp) {
+    memberlist_lock(list);
     int idx = 0;
     while (idx < list->count) {
         struct member *cur = &list->values[idx];
@@ -147,15 +139,44 @@ void member_list_cleanup(struct member_list *list, int global_timestamp) {
             member_to_cstring(cur, buf, MAX_STRING);
             log_event(E_PEER_FAIL, "%s", buf);
 
-            memcpy(cur, &list->values[list->count - 1], sizeof(struct member));
+            if (idx != list->count - 1) {
+                memcpy(cur, &list->values[list->count - 1], sizeof(struct member));
+            }
             list->count--;
         } else {
             idx++;        
         }
     }
+
+    memberlist_unlock(list);
 }
 
+bool member_list_random_entry(struct member_list *list, struct member *result, port_t my_port) {
+    memberlist_lock(list);
+    assert(list->count > 0);
+    if (list->count == 1) {
+        memberlist_unlock(list);
+        return false; 
+    }
+
+    while (true) {
+        int r = randint(0, list->count - 1);
+        struct member *cur = &list->values[r];
+        if (cur->port != my_port) {
+            *result = *cur;
+            memberlist_unlock(list);
+            return true;
+        }
+    }
+
+    assert(false);
+    memberlist_unlock(list);
+    return true;  
+}
+
+
 void member_list_update(struct member_list *list, struct member *member, int global_timestamp) {
+    //memberlist_lock(list);
     int idx;
     if ((idx = member_list_idx(list, member->port)) >= 0) {
         struct member *cur = &list->values[idx];
@@ -171,32 +192,18 @@ void member_list_update(struct member_list *list, struct member *member, int glo
         member_to_cstring(&list->values[list->count - 1], buf, MAX_STRING);
         log_event(E_PEER_JOIN, "%s", buf);
     }
-}
 
-bool member_list_random_entry(struct member_list *list, struct member *result, port_t my_port) {
-    assert(list->count > 0);
-    if (list->count == 1) {
-        return false; 
-    }
-
-    while (true) {
-        int r = randint(0, list->count - 1);
-        struct member *cur = &list->values[r];
-        if (cur->port != my_port) {
-            *result = *cur;
-            return true;
-        }
-    }
-
-    assert(false);
-    return true;  
+    //memberlist_unlock(list);
 }
 
 void member_list_merge(struct member_list *list, struct member_list *other, int global_timestamp) {
+    memberlist_lock(list);
     for (int i = 0; i < other->count; i++) {
         struct member cur = other->values[i];
+
         member_list_update(list, &cur, global_timestamp);
     }
+    memberlist_unlock(list);
 }
 
 int member_list_failed_members(const struct member_list *list, int global_timestamp) {
@@ -211,7 +218,9 @@ int member_list_failed_members(const struct member_list *list, int global_timest
     return count;
 }
 
-size_t serialize_nonfailed_members(const struct member_list *list, struct arena *arena, char **out_buf, int global_timestamp) {
+size_t serialize_nonfailed_members(struct member_list *list, struct arena *arena, char **out_buf, int global_timestamp) {
+    memberlist_lock(list);
+
     struct member_list nonfailed;
     member_list_init(&nonfailed, arena, NULL);
     for (int i = 0; i < list->count; i++) {
@@ -221,7 +230,9 @@ size_t serialize_nonfailed_members(const struct member_list *list, struct arena 
         }
     }
 
-    return member_list_serialize(&nonfailed, arena, out_buf);
+    size_t s =  member_list_serialize(&nonfailed, arena, out_buf);
+    memberlist_unlock(list);
+    return s;
 }
 
 /*
@@ -276,5 +287,3 @@ void member_list_serialization_test(struct arena *arena) {
     //check that members are what we expect
 }
 */
-
-#endif //MEMBER_H

@@ -7,8 +7,7 @@
 #include "arena.h"
 #include "net.h"
 #include "string.h"
-
-typedef uint16_t port_t;
+#include "common.h"
 
 enum msg_type {
     MT_GREP_REQ,

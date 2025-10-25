@@ -10,11 +10,11 @@ all: client server
 	./test/temp/machine.3006 \
 	./test/temp/machine.3007
 
-client: dgrep.c msg.h net.h arena.h util.h string.h log.h
-	gcc -o dgrep dgrep.c
+client: dgrep.c msg.h net.h arena.h common.h
+	clang -o dgrep dgrep.c common.c
 
-server: node.c msg.h net.h member.h util.h arena.h string.h log.h
-	gcc -o node node.c
+server: node.c msg.h net.h membership.h arena.h common.h common.c membership.c
+	clang -o node -fsanitize=address -g node.c membership.c common.c
 
 clean:
 	rm dgrep \

@@ -1,15 +1,14 @@
 #include "net.h"
 #include "msg.h"
-#include "member.h"
-#include "util.h"
+#include "membership.h"
 #include "arena.h"
-#include "log.h"
+#include "common.h"
 #include <stdio.h>
 #include <pthread.h>
 
 #define INTRODUCER_PORT 3000
-#define T_GOSSIP 500000 / 1 //make this 1000 to see race condition //TODO
-#define T_TIMESTAMP 250000 / 1 //make this 1000 to see race condition //TODO
+#define T_GOSSIP 500000 / 1000 //make this 1000 to see race condition //TODO
+#define T_TIMESTAMP 250000 / 1000 //make this 1000 to see race condition //TODO
 #define T_INTRODUCER_MSG 8 //period between contacting introducer (to ensure failed introducers accepted back into group on rejoining)
 
 struct msg_queue *msg_queue; //TODO: rename to g_msg_queue
@@ -19,6 +18,7 @@ uint64_t g_timestamp;
 port_t g_port;
 struct member_list *g_member_list;
 pthread_mutex_t g_memberlist_mtx;
+bool g_joined;
 
 static inline bool is_introducer(port_t port) {
     return port == INTRODUCER_PORT;
@@ -29,15 +29,18 @@ static inline port_t get_introducer() {
 }
 
 void *introducer_messager(void *arg) {
+    struct arena arena;
+    arena_init(&arena, malloc, realloc, free);
     while (true) {
         port_t introducer_port = get_introducer();
         char *buf;
-        size_t size = serialize_nonfailed_members(g_member_list, &msg_queue->arena, &buf, g_timestamp);
+        size_t size = serialize_nonfailed_members(g_member_list, &arena, &buf, g_timestamp);
         struct string payload = { .ptr=buf, .len=size };
         struct msg msg = { .type=MT_JOIN_REQ, .src=g_port, .dst=introducer_port, .payload=payload };
-        if (!node_send_msg(&msg, &msg_queue->arena)) {
+        if (!node_send_msg(&msg, &arena)) {
             //do nothing
         }
+        arena_dealloc_all(&arena);
 
         sleep(T_INTRODUCER_MSG);
     }
@@ -82,7 +85,9 @@ void *node_gossip(void *arg) {
         update_own_heartbeat(g_member_list, g_port, g_timestamp, g_heartbeat);
 
         char *buf;
-        size_t size = serialize_nonfailed_members(g_member_list, &msg_queue->arena, &buf, g_timestamp);
+        //size_t size = serialize_nonfailed_members(g_member_list, &msg_queue->arena, &buf, g_timestamp);
+        size_t size = serialize_nonfailed_members(g_member_list, &arena, &buf, g_timestamp);
+
         struct member m;
         if (member_list_random_entry(g_member_list, &m, g_port)) {
             struct msg msg = { .type=MT_HEARTBEAT, .src=g_port, .dst=m.port, .payload=(struct string) { .ptr=buf, .len=size } };
@@ -105,12 +110,12 @@ void *update_timestamp(void *arg) {
     }
 }
 
-void handle_msg(struct msg *msg) {
+void handle_msg(struct msg *msg, struct arena *arena) {
     switch (msg->type) {
     case MT_GREP_REQ: {
         print_msg(msg);
 
-        char *cstring = string_to_cstring(&msg->payload, &msg_queue->arena);
+        char *cstring = string_to_cstring(&msg->payload, arena);
 
         FILE * cmd = popen(cstring, "r");
         if (cmd == NULL) {
@@ -119,14 +124,14 @@ void handle_msg(struct msg *msg) {
 
         //read local grep results
         size_t capacity = 32;
-        char *result = arena_malloc(&msg_queue->arena, capacity);
+        char *result = arena_malloc(arena, capacity);
         result[0] = '\0';
         size_t size = strlen(result);
         while (fgets(result + size, capacity - size, cmd)) {
             size = strlen(result);
             if (size == capacity - 1) {
                 capacity *= 2;
-                result = arena_realloc(&msg_queue->arena, result, capacity);
+                result = arena_realloc(arena, result, capacity);
             }
         }
 
@@ -138,7 +143,7 @@ void handle_msg(struct msg *msg) {
         res_msg.src = msg->dst;
         res_msg.dst = msg->src;
         res_msg.payload = (struct string) { .ptr = result, .len = size };
-        if (!node_send_msg(&res_msg, &msg_queue->arena)) {
+        if (!node_send_msg(&res_msg, arena)) {
             printf("failed to connect\n");
         } else {
             printf("sent response\n");
@@ -147,15 +152,15 @@ void handle_msg(struct msg *msg) {
     }
     case MT_JOIN_REQ: {
         struct member_list peer_list;
-        member_list_init(&peer_list, &msg_queue->arena, NULL);
+        member_list_init(&peer_list, arena, NULL);
         member_list_deserialize(msg->payload.ptr,&peer_list);
         member_list_merge(g_member_list, &peer_list, g_timestamp);
 
 
         char *buf;
-        size_t size = serialize_nonfailed_members(g_member_list, &msg_queue->arena, &buf, g_timestamp);
+        size_t size = serialize_nonfailed_members(g_member_list, arena, &buf, g_timestamp);
         struct msg res_msg = { .type=MT_JOIN_RES, .src=msg->dst, .dst=msg->src, .payload=(struct string) { .ptr=buf, .len=size } };
-        if (!node_send_msg(&res_msg, &msg_queue->arena)) {
+        if (!node_send_msg(&res_msg, arena)) {
             printf("failed to connect\n");
         } else {
             //printf("sent response\n");
@@ -164,14 +169,14 @@ void handle_msg(struct msg *msg) {
     }
     case MT_JOIN_RES: {
         struct member_list peer_list;
-        member_list_init(&peer_list, &msg_queue->arena, NULL);
+        member_list_init(&peer_list, arena, NULL);
         member_list_deserialize(msg->payload.ptr,&peer_list);
         member_list_merge(g_member_list, &peer_list, g_timestamp);
         break;
     }
     case MT_HEARTBEAT: {
         struct member_list peer_list;
-        member_list_init(&peer_list, &msg_queue->arena, NULL);
+        member_list_init(&peer_list, arena, NULL);
         member_list_deserialize(msg->payload.ptr,&peer_list);
         member_list_merge(g_member_list, &peer_list, g_timestamp);
         break; 
@@ -199,6 +204,7 @@ int main(int argc, char **argv) {
 
     char *endptr;
     g_port = strtoul(argv[1], &endptr, 10);
+    g_joined = false;
     log_init(g_port);
     struct member me = { .port=g_port, .heartbeat=g_heartbeat, .timestamp=g_timestamp };
     member_list_update(g_member_list, &me, g_timestamp);
@@ -248,12 +254,14 @@ int main(int argc, char **argv) {
         }
     }
     
-
+    struct arena arena;
+    arena_init(&arena, malloc, realloc, free);
     while (true) {
         struct msg *msg;
         while (msg_queue_dequeue(msg_queue, &msg)) {
-            //printf("handling msg\n");
-            handle_msg(msg);
+            handle_msg(msg, &arena);
+            arena_dealloc_all(&arena);
+            
         }
 
         msg_queue_clear(msg_queue);        

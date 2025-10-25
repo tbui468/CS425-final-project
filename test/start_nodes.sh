@@ -6,7 +6,7 @@ pushd ./temp/machine.3000
 popd
 
 #sleep to give introducer chance to start up
-#sleep 0.1
+sleep 0.1
 
 pushd ./temp/machine.3001
 ./../../../node 3001 &

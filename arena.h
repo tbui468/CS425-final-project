@@ -2,6 +2,9 @@
 #define ARENA_H
 
 #include <assert.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
 #define DEFAULT_CHUNK_SIZE 4096
 
 union align {
